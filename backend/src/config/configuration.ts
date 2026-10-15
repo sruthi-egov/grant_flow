@@ -73,6 +73,29 @@ export interface AppConfig {
   };
 }
 
+/**
+ * Flags an API key that is almost certainly mis-copied.
+ *
+ * A trailing full stop picked up from a sentence, a wrapping quote, or inner
+ * whitespace are invisible in a 160-character string but cause an opaque 401
+ * from the provider. Returns a reason, or null when the key looks sane.
+ */
+export function describeSuspectApiKey(raw: string | undefined): string | null {
+  if (!raw) return null;
+
+  if (raw !== raw.trim()) return 'it has leading or trailing whitespace';
+  const key = raw.trim();
+
+  if (/^['"]|['"]$/.test(key)) return 'it is wrapped in quotation marks';
+  if (/[.,;]$/.test(key)) {
+    return `it ends with "${key.slice(-1)}", which is not part of an API key — it was probably copied from the end of a sentence`;
+  }
+  if (/\s/.test(key)) return 'it contains a space or line break';
+  if (!/^sk-/.test(key)) return 'it does not start with "sk-"';
+
+  return null;
+}
+
 export default (): AppConfig => {
   const nodeEnv = process.env.NODE_ENV ?? 'development';
   const apiKey = (process.env.OPENAI_API_KEY ?? '').trim();

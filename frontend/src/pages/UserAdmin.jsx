@@ -138,11 +138,14 @@ export default function UserAdmin() {
             : `Invitation sent to ${email}.`,
         );
       } else {
-        // The invitation exists; only delivery failed. Say so rather than
-        // claiming success.
+        // The invitation exists; only delivery failed. Say so, with the
+        // backend's reason, rather than claiming success.
         toast.warning(
-          `Invitation created for ${email}, but the email could not be delivered ` +
-          `(${result?.email_status ?? "unknown"}). Check the mail settings, then use Resend.`,
+          result?.email_error
+            ? `Invitation created for ${email}, but the email was not sent. ${result.email_error}`
+            : `Invitation created for ${email}, but the email could not be delivered ` +
+              `(${result?.email_status ?? "unknown"}). Check the mail settings, then use Resend.`,
+          { duration: 12000 },
         );
       }
 
@@ -177,8 +180,11 @@ export default function UserAdmin() {
         toast.success(`New invitation link sent to ${invitation.email}. The previous link no longer works.`);
       } else {
         toast.warning(
-          `New link created for ${invitation.email}, but the email could not be delivered ` +
-          `(${result?.email_status ?? "unknown"}).`,
+          result?.email_error
+            ? `New link created for ${invitation.email}, but the email was not sent. ${result.email_error}`
+            : `New link created for ${invitation.email}, but the email could not be delivered ` +
+              `(${result?.email_status ?? "unknown"}).`,
+          { duration: 12000 },
         );
       }
       await loadInvitations();

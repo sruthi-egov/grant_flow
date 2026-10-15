@@ -122,12 +122,36 @@ export class MailerService implements OnModuleInit {
     };
   }
 
-  /** Returns false when the address is outside MAIL_ALLOWED_DOMAINS. */
-  isAllowedRecipient(email: string): boolean {
+  /**
+   * Decides whether a recipient may be sent to.
+   *
+   * MAIL_ALLOWED_DOMAINS exists to stop demo data from emailing real people by
+   * accident. That risk only exists with a real relay — when SMTP points at a
+   * local capture tool, every message is trapped on this machine and nothing
+   * can reach anyone, so the restriction is skipped.
+   *
+   * Enforcing it in local capture caused real confusion: invitations to
+   * ordinary addresses were silently dropped and never appeared in Mailpit,
+   * which looked like Mailpit being broken.
+   */
+  isAllowedRecipient(email: string): { allowed: boolean; reason?: string } {
+    if (this.isLocalCapture) return { allowed: true };
+
     const allowed: string[] = this.config.get('mail.allowedDomains') ?? [];
-    if (allowed.length === 0) return true;
+    if (allowed.length === 0) return { allowed: true };
+
     const domain = email.split('@')[1]?.toLowerCase();
-    return Boolean(domain && allowed.some((d) => d.toLowerCase() === domain));
+    if (domain && allowed.some((d) => d.toLowerCase() === domain)) {
+      return { allowed: true };
+    }
+
+    return {
+      allowed: false,
+      reason:
+        `Real email delivery is configured, and "${domain ?? email}" is not in MAIL_ALLOWED_DOMAINS ` +
+        `(${allowed.join(', ')}). Nothing was sent. Add the domain to MAIL_ALLOWED_DOMAINS in ` +
+        'backend/.env and restart the backend to allow it.',
+    };
   }
 
   async send(options: {
@@ -138,10 +162,10 @@ export class MailerService implements OnModuleInit {
   }): Promise<SendResult> {
     const mail = this.config.get<any>('mail');
 
-    if (!this.isAllowedRecipient(options.to)) {
-      const msg = `Recipient domain not in MAIL_ALLOWED_DOMAINS — refused to send to ${options.to}`;
-      this.logger.warn(msg);
-      return { status: 'skipped', error: msg };
+    const gate = this.isAllowedRecipient(options.to);
+    if (!gate.allowed) {
+      this.logger.warn(`Refused to send to ${options.to}: ${gate.reason}`);
+      return { status: 'skipped', error: gate.reason };
     }
 
     try {

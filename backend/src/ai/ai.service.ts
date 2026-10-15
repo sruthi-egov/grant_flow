@@ -1,6 +1,7 @@
-import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import OpenAI from 'openai';
+import { describeSuspectApiKey } from '../config/configuration';
 
 export class AiNotConfiguredError extends ServiceUnavailableException {
   constructor() {
@@ -34,23 +35,44 @@ export interface LlmCallResult<T = any> {
  * throws — callers surface the error rather than substituting empty results.
  */
 @Injectable()
-export class AiService {
+export class AiService implements OnModuleInit {
   private readonly logger = new Logger(AiService.name);
   private client: OpenAI | null = null;
 
   constructor(private readonly config: ConfigService) {}
+
+  onModuleInit(): void {
+    if (!this.isEnabled) {
+      this.logger.log('OPENAI_API_KEY not set — document extraction is disabled.');
+      return;
+    }
+    const suspect = describeSuspectApiKey(process.env.OPENAI_API_KEY);
+    if (suspect) {
+      this.logger.warn(
+        `OPENAI_API_KEY looks mis-copied: ${suspect}. Extraction will fail with a 401 until it is fixed.`,
+      );
+    } else {
+      this.logger.log(`Document extraction enabled (model: ${this.config.get<string>('ai.model')}).`);
+    }
+  }
 
   get isEnabled(): boolean {
     return this.config.get<boolean>('ai.enabled') === true;
   }
 
   get status() {
+    const suspect = describeSuspectApiKey(process.env.OPENAI_API_KEY);
+
     return {
       enabled: this.isEnabled,
       provider: 'openai',
       model: this.config.get<string>('ai.model'),
+      // Surfaces a mis-copied key before the user has to decode a 401.
+      key_format_warning: this.isEnabled && suspect ? `The configured key looks wrong: ${suspect}.` : null,
       note: this.isEnabled
-        ? 'Document extraction is available.'
+        ? suspect
+          ? `A key is configured but ${suspect}. Extraction will fail until it is corrected.`
+          : 'Document extraction is available.'
         : 'OPENAI_API_KEY is not set — document extraction endpoints will return 503. Every other feature is unaffected.',
     };
   }

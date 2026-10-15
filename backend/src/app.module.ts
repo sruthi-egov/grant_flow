@@ -15,7 +15,15 @@ import { HealthModule } from './health/health.module';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true, load: [configuration], cache: true }),
+    // `ignoreEnvFile` because main.ts already loaded .env with file-wins
+    // precedence (see config/load-env.ts). Loading it twice here would be
+    // harmless but confusing.
+    ConfigModule.forRoot({
+      isGlobal: true,
+      load: [configuration],
+      cache: true,
+      ignoreEnvFile: true,
+    }),
     // Backs the daily notification cron.
     ScheduleModule.forRoot(),
     ThrottlerModule.forRoot([{ ttl: 60_000, limit: 300 }]),

@@ -1,3 +1,7 @@
+// Must run before AppModule is imported, so ConfigModule sees the final values.
+import { describeEnvLoad, loadEnv } from './config/load-env';
+const envReport = loadEnv();
+
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory, Reflector } from '@nestjs/core';
@@ -14,6 +18,9 @@ import { JwtAuthGuard } from './common/guards';
 
 async function bootstrap(): Promise<void> {
   const logger = new Logger('Bootstrap');
+
+  // Report where configuration came from, by name only.
+  for (const line of describeEnvLoad(envReport)) logger.log(line);
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     // Keep stack traces off the wire; AllExceptionsFilter formats responses.
     logger: ['error', 'warn', 'log'],

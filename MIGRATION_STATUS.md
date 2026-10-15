@@ -167,7 +167,7 @@ reason the baseline commit was made first.
 
 | Item | Status | Why | How to resolve |
 |---|---|---|---|
-| **Live AI extraction** | ❌ **Blocked — the API key is invalid** | Ran with approval. The `OPENAI_API_KEY` in the Windows *user* environment is rejected by OpenAI: `401 Incorrect API key provided`. The key is expired, revoked, or mistyped. | Set a valid key and re-run `scripts/verify/` or use the UI. See below. |
+| **Live AI extraction** | ❌ **Blocked — the API key is still rejected** | Re-tested 2026-10-15 after a reported key change. `backend/.env` was still blank, so the backend used the inherited Windows variable — unchanged, and **ending in a `.`** (`...i4A.`), which is not part of an API key. OpenAI returns `401 Incorrect API key provided`. | Paste the key into `backend/.env` (it now wins over the inherited one) with **no trailing full stop**, restart, and run `scripts/verify/ai-extraction.ps1`. |
 | **Browser UI verification** | ⚠️ Not done | The `chrome-devtools` MCP server failed to connect this session. | Manual steps in `LOCAL_DEMO_GUIDE.md` → "Five-minute walkthrough". |
 | **Base44 data import** | ❌ Not possible | The export contains **source code and schema only** — no database rows and no uploaded PDFs. | Requires a data export from Base44. See §7. |
 | `inviteUser`, `sendTestNotification`, DB reset, file cleanup | Implemented, not exercised | Destructive or needs a UI flow. | Exercise manually during the demo. |
@@ -192,13 +192,29 @@ was being passed straight through to the browser. Provider errors are now logged
 translated into a safe, actionable message (`invalid_credentials`, `rate_limited_or_quota`, `model_unavailable`,
 `provider_error`).
 
-To finish this check, set a working key and retry:
+To finish this check, set a working key in `backend/.env` and retry:
 
 ```powershell
-$env:OPENAI_API_KEY = 'sk-...'      # or edit backend/.env
-cd backend; npm run start:dev       # restart so it is picked up
-# then use "Extract from PDF" on a grant in the UI with a text-layer PDF
+# backend/.env  ->  OPENAI_API_KEY=sk-proj-...   (no trailing full stop)
+cd backend; npm run start:dev
+powershell -File scripts\verify\ai-extraction.ps1
 ```
+
+#### Two configuration traps removed on 2026-10-15
+
+Both were found because a reported key change had no effect:
+
+1. **`.env` was being ignored.** dotenv never overwrites an existing process
+   variable, so a stale `OPENAI_API_KEY` in the Windows user environment
+   silently beat the file. `src/config/load-env.ts` now loads `.env` first with
+   **file-wins** precedence (a non-empty file value overrides an inherited one;
+   a blank one defers, so container injection still works) and logs every
+   override **by name, never by value**.
+2. **A mis-copied key produced an opaque 401.** The configured key ended with a
+   `.` — invisible in a 165-character string. `describeSuspectApiKey()` now
+   checks for a trailing `.`/`,`/`;`, wrapping quotes, inner whitespace and a
+   missing `sk-` prefix, and reports the specific fault at startup and in
+   `/api/ai/status`.
 
 ### Known limitations
 
@@ -322,6 +338,29 @@ isolation.
 
 Full regression after the change: **246 checks passing**
 (102 unit + 35 smoke + 43 e2e + 14 persistence + 52 invitations).
+
+### "Mailpit is not working" — it was the recipient allow-list
+
+Reported 2026-10-15. Mailpit was healthy throughout: containers up, ports 8025
+and 1025 listening, API responding, and a test send to `@grantos.local` arrived
+immediately.
+
+The real cause was `MAIL_ALLOWED_DOMAINS`. Invitations to ordinary addresses
+(`@egov.org.in`, `@gmail.com`) were **refused by our own guard** before reaching
+SMTP, so nothing appeared in Mailpit and it looked broken.
+
+That guard exists to stop demo data emailing real people — a risk that only
+exists with a **real relay**. Scoping corrected:
+
+- **Local capture (Mailpit):** the allow-list is **not** applied. Nothing can
+  leave the machine, so any address may be invited.
+- **Real delivery:** the allow-list is enforced as before.
+- A refusal now returns an **error naming the domain and the fix**, and the
+  ad-hoc send endpoint fails loudly instead of returning `200` with
+  `status: "skipped"`.
+
+Verified after the change: inviting `mailtest.demo@gmail.com` reports
+`email_status: sent` and the message appears in Mailpit.
 
 ### Still unverified
 

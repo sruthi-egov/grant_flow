@@ -203,18 +203,37 @@ $t = (Invoke-RestMethod http://127.0.0.1:3001/api/auth/login -Method Post -Conte
 Invoke-RestMethod http://127.0.0.1:3001/api/ai/status -Headers @{Authorization="Bearer $t"}
 ```
 
-> **⚠️ Note for this machine.** An `OPENAI_API_KEY` is set in your Windows *user* environment, so the backend picks
-> it up and `/api/ai/status` reports `enabled: true` — but **OpenAI rejects it**: a real extraction run returned
-> `401 Incorrect API key provided`. The key is expired, revoked, or mistyped. Until it is replaced, extraction
-> will fail with a clear "credentials rejected" message. Everything else in the app is unaffected.
->
-> To fix: put a working key in `backend/.env` **and** clear the stale one from your environment
-> (`[Environment]::SetEnvironmentVariable('OPENAI_API_KEY', $null, 'User')`, then open a new terminal) — an empty
-> value in `.env` does **not** override an inherited variable, because dotenv never overwrites an existing
-> process variable.
->
-> To disable AI cleanly for a demo instead: `$env:OPENAI_API_KEY=''` in the terminal before `npm run start:dev`.
-> Extraction then reports `503 ai_not_configured`, which is the honest "not set up" state.
+### Where the key goes
+
+Put it in **`backend/.env`**, variable **`OPENAI_API_KEY`**:
+
+```
+OPENAI_API_KEY=sk-proj-...
+```
+
+Then restart the backend. **A non-empty value in `.env` now wins over any stale
+`OPENAI_API_KEY` left in your Windows user environment** — the backend loads the
+file with file-wins precedence and logs, by name, which variables it overrode.
+Leaving the `.env` entry blank still defers to the inherited value, so
+container-injected configuration keeps working; the startup log says so
+explicitly when that happens.
+
+To clear a stale machine-level key entirely:
+
+```powershell
+[Environment]::SetEnvironmentVariable('OPENAI_API_KEY', $null, 'User')
+# then open a NEW terminal - the current one keeps the old value
+```
+
+**Watch for a mis-copied key.** A trailing full stop picked up from the end of a
+sentence, wrapping quotes, or a stray space are invisible in a 160-character
+string and produce an opaque `401` from OpenAI. The backend now checks the
+format at startup and reports the specific problem in the log and in
+`/api/ai/status` (`key_format_warning`) rather than letting you guess.
+
+To disable AI cleanly for a demo: set `OPENAI_API_KEY=` empty in `.env` *and*
+clear it from your environment. Extraction then reports `503 ai_not_configured`,
+the honest "not set up" state.
 
 To test extraction end to end, upload a **text-layer** PDF to a grant in the UI and use *Extract from PDF*.
 Expect: deliverables and milestones proposed for review before anything is saved.
@@ -257,7 +276,10 @@ Links expire after `INVITATION_EXPIRY_DAYS` (default 7) and can be used once.
 
 > **During the demo, invitation emails go to Mailpit** at <http://localhost:8025>,
 > like every other message. Open the message there and click the link to walk
-> through acceptance.
+> through acceptance. While SMTP points at Mailpit you can invite **any**
+> address — including real ones — because nothing can leave this machine.
+> The `MAIL_ALLOWED_DOMAINS` restriction applies only once real delivery is
+> configured.
 
 ### Sending a real invitation to a real person
 
@@ -278,13 +300,17 @@ MAIL_FROM_ADDRESS=    # an address on a domain your provider is allowed to send 
 Workspace, Amazon SES, SendGrid and Mailgun. Google needs an **App Password**
 (2-Step Verification enabled); a normal account password is rejected.
 
-**2. Allow the recipient's domain.** Mail to any domain not in
-`MAIL_ALLOWED_DOMAINS` is **refused, not sent** — that is the guard stopping demo
-data from emailing real people:
+**2. Allow the recipient's domain.** Once real SMTP is configured, mail to any
+domain not in `MAIL_ALLOWED_DOMAINS` is **refused, not sent** — the guard that
+stops demo data from emailing real people:
 
 ```
 MAIL_ALLOWED_DOMAINS=grantos.local,example.com,example.org,theirdomain.org
 ```
+
+This restriction is **not** applied while SMTP points at Mailpit, because
+nothing can escape a local capture tool. A refusal is reported as an error
+naming the domain and the fix — never a silent no-op.
 
 **3. Make the link reachable.** `APP_PUBLIC_URL=http://localhost:5173` only
 resolves on *your* machine. A recipient elsewhere receives a link that goes

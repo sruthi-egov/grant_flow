@@ -125,7 +125,13 @@ export class InvitationsService {
       can_upload_pdf?: boolean;
     },
     actor: AuthenticatedUser,
-  ): Promise<{ invitation: InvitationView; email_status: string; accept_url?: string; resent: boolean }> {
+  ): Promise<{
+    invitation: InvitationView;
+    email_status: string;
+    email_error: string | null;
+    accept_url?: string;
+    resent: boolean;
+  }> {
     const email = this.normalizeEmail(input.email);
     const role = input.role === 'admin' ? 'admin' : 'user';
     const allowed_modules = this.sanitizeModules(input.allowed_modules);
@@ -172,7 +178,7 @@ export class InvitationsService {
       });
     });
 
-    const emailStatus = await this.sendInvitationEmail(email, token, role, expires_at, actor);
+    const delivery = await this.sendInvitationEmail(email, token, role, expires_at, actor);
 
     await this.audit(
       previousPending ? 'invitation_resent' : 'invitation_created',
@@ -183,12 +189,13 @@ export class InvitationsService {
     );
 
     this.logger.log(
-      `${previousPending ? 'Resent' : 'Created'} invitation for ${email} (${role}) by ${actor.email}; email ${emailStatus}`,
+      `${previousPending ? 'Resent' : 'Created'} invitation for ${email} (${role}) by ${actor.email}; email ${delivery.status}`,
     );
 
     return {
       invitation: this.toView(invitation),
-      email_status: emailStatus,
+      email_status: delivery.status,
+      email_error: delivery.reason ?? null,
       // Shown to the admin outside production so a demo works without opening
       // the mail UI. Never included in a production response.
       accept_url: this.config.get<boolean>('isProduction') ? undefined : this.acceptUrl(token),
@@ -197,10 +204,7 @@ export class InvitationsService {
   }
 
   /** Issues a fresh token for an existing pending invitation. */
-  async resend(
-    id: string,
-    actor: AuthenticatedUser,
-  ): Promise<{ invitation: InvitationView; email_status: string; accept_url?: string }> {
+  async resend(id: string, actor: AuthenticatedUser) {
     const existing = await this.prisma.invitation.findUnique({ where: { id } });
     if (!existing) throw new NotFoundException('Invitation not found');
 
@@ -409,7 +413,7 @@ export class InvitationsService {
     role: string,
     expiresAt: Date,
     actor: AuthenticatedUser,
-  ): Promise<string> {
+  ): Promise<{ status: string; reason?: string }> {
     const url = this.acceptUrl(token);
     const inviter = actor.display_name || actor.full_name || actor.email;
     const expiryDays = Math.round(this.ttlMs() / 86_400_000);
@@ -442,7 +446,7 @@ export class InvitationsService {
     if (result.status !== 'sent') {
       this.logger.warn(`Invitation email to ${email} was ${result.status}: ${result.error ?? 'no reason given'}`);
     }
-    return result.status;
+    return { status: result.status, reason: result.error };
   }
 
   private escape(value: string): string {

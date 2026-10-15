@@ -687,10 +687,16 @@ ${rendered.body}`;
       })
       .catch(() => undefined);
 
-    if (result.status === 'failed') {
-      throw new BadRequestException(`Email could not be sent: ${result.error}`);
+    // An admin explicitly asked for this send, so a refusal must surface as an
+    // error rather than a 200 that quietly did nothing.
+    if (result.status === 'failed' || result.status === 'skipped') {
+      throw new BadRequestException(
+        result.status === 'skipped'
+          ? result.error
+          : `Email could not be sent: ${result.error}`,
+      );
     }
-    return { status: result.status, to, error: result.error ?? null };
+    return { status: result.status, to, error: null };
   }
 
   /** Simple "is SMTP working" probe used by the Settings page. */
