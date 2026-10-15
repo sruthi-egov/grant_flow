@@ -16,6 +16,11 @@ export default defineConfig({
   server: {
     port: 5173,
     strictPort: true,
+    // Bind all interfaces. By default Vite listens on ::1 only, so
+    // http://127.0.0.1:5173 fails while http://localhost:5173 works — a
+    // confusing difference during a demo. This also allows showing the app
+    // from another device on the same network.
+    host: true,
     proxy: {
       // Same-origin /api keeps the httpOnly session cookie working for
       // document downloads (opened as plain links, which cannot carry an
