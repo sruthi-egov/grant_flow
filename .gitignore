@@ -29,3 +29,13 @@ dist-ssr
 
 .env
 base44/.app.jsonc
+
+# Backend build output / local state
+backend/dist/
+backend/storage/
+*.tsbuildinfo
+.backend.log
+.backend.err.log
+
+# Keep env templates tracked, never real env files
+!.env.example

@@ -1,0 +1,38 @@
+{
+  "compilerOptions": {
+    "module": "commonjs",
+    "declaration": false,
+    "removeComments": true,
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "sourceMap": true,
+    "outDir": "./dist",
+    // Pin the root so `dist/main.js` stays the entry point. Without this,
+    // compiling prisma/seed.ts would shift output to dist/src/main.js.
+    "rootDir": "./src",
+    "baseUrl": "./src",
+    "paths": {
+      "@/*": ["*"]
+    },
+    "incremental": true,
+    // Keep the incremental cache inside dist so `nest build` (deleteOutDir)
+    // clears it too. Left at the default it survives a dist wipe and tsc then
+    // silently emits nothing.
+    "tsBuildInfoFile": "./dist/tsconfig.tsbuildinfo",
+    "skipLibCheck": true,
+    "strictNullChecks": true,
+    "noImplicitAny": false,
+    "strictBindCallApply": true,
+    "forceConsistentCasingInFileNames": true,
+    "noFallthroughCasesInSwitch": true,
+    "resolveJsonModule": true
+  },
+  // prisma/seed.ts is intentionally excluded: it is executed with ts-node,
+  // never bundled into the server build.
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist"]
+}

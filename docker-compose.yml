@@ -1,0 +1,129 @@
+# GrantOS — local stack.
+#
+#   docker compose up -d                  → Postgres + Mailpit only
+#                                           (run backend/frontend with npm; best for development)
+#   docker compose --profile app up -d    → the whole application in containers
+#
+# Host ports are deliberately non-default so this stack never collides with a
+# PostgreSQL or dev server you already run. Data and uploads live in named
+# volumes, so `docker compose down` (without -v) keeps everything.
+
+name: grantos
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: grantos-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-grantos}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-grantos_local_dev}
+      POSTGRES_DB: ${POSTGRES_DB:-grantos}
+    ports:
+      - "${POSTGRES_HOST_PORT:-55432}:5432"
+    volumes:
+      - grantos-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-grantos} -d ${POSTGRES_DB:-grantos}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+
+  # Local SMTP sink. Captures every outgoing email and shows it in a web UI.
+  # Nothing is ever delivered to a real recipient.
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: grantos-mailpit
+    restart: unless-stopped
+    environment:
+      MP_MAX_MESSAGES: 5000
+      MP_SMTP_AUTH_ACCEPT_ANY: 1
+      MP_SMTP_AUTH_ALLOW_INSECURE: 1
+    ports:
+      - "${MAILPIT_UI_PORT:-8025}:8025"   # web UI
+      - "${MAILPIT_SMTP_PORT:-1025}:1025" # SMTP
+    volumes:
+      - grantos-mailpit:/data
+    healthcheck:
+      test: ["CMD", "/mailpit", "readyz"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+
+  backend:
+    profiles: ["app"]
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: runtime
+    container_name: grantos-backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mailpit:
+        condition: service_started
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      DATABASE_URL: postgresql://${POSTGRES_USER:-grantos}:${POSTGRES_PASSWORD:-grantos_local_dev}@postgres:5432/${POSTGRES_DB:-grantos}?schema=public
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173}
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:-dev-only-access-secret-change-me-before-any-shared-deployment}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-dev-only-refresh-secret-change-me-before-any-shared-deployment}
+      UPLOAD_DIR: /app/storage/uploads
+      SMTP_HOST: mailpit
+      SMTP_PORT: 1025
+      SMTP_SECURE: "false"
+      MAIL_FROM_NAME: ${MAIL_FROM_NAME:-GrantOS Notifications}
+      MAIL_FROM_ADDRESS: ${MAIL_FROM_ADDRESS:-notifications@grantos.local}
+      MAIL_ALLOWED_DOMAINS: ${MAIL_ALLOWED_DOMAINS:-grantos.local,example.com,example.org}
+      APP_PUBLIC_URL: ${APP_PUBLIC_URL:-http://localhost:5173}
+      NOTIFICATIONS_CRON_ENABLED: ${NOTIFICATIONS_CRON_ENABLED:-true}
+      NOTIFICATIONS_CRON: ${NOTIFICATIONS_CRON:-30 3 * * *}
+      # Optional — extraction reports "not configured" when absent.
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
+      SEED_ADMIN_EMAIL: ${SEED_ADMIN_EMAIL:-admin@grantos.local}
+      SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-DemoAdmin!2026}
+      SEED_USER_EMAIL: ${SEED_USER_EMAIL:-analyst@grantos.local}
+      SEED_USER_PASSWORD: ${SEED_USER_PASSWORD:-DemoUser!2026}
+    ports:
+      - "${BACKEND_HOST_PORT:-3001}:3001"
+    volumes:
+      - grantos-uploads:/app/storage/uploads
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3001/api/health/live').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+
+  frontend:
+    profiles: ["app"]
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:3001}
+    container_name: grantos-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "${FRONTEND_HOST_PORT:-5173}:80"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+volumes:
+  grantos-pgdata:
+    name: grantos-pgdata
+  grantos-uploads:
+    name: grantos-uploads
+  grantos-mailpit:
+    name: grantos-mailpit

@@ -1,0 +1,1133 @@
+// GrantOS – standalone PostgreSQL schema.
+//
+// Translated 1:1 from the Base44 entity definitions preserved in
+// docs/base44-legacy-reference/entities/*.jsonc.
+//
+// Naming rules kept deliberately faithful to the Base44 payload shape so the
+// existing React UI keeps working without field renaming:
+//   * snake_case column + JSON field names
+//   * every record carries id / created_date / updated_date / created_by
+// Nested Base44 "array of object" properties (contacts, rate_cards, ...) are
+// stored as Json, exactly as the UI sends and reads them.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Auth & access control
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum UserRole {
+  admin
+  user
+}
+
+model User {
+  id            String   @id @default(uuid())
+  email         String   @unique
+  password_hash String
+  full_name     String?
+  display_name  String?
+  role          UserRole @default(user)
+
+  /// Which modules this user can access. Empty list = all modules.
+  /// Mirrors Base44 "allowed_modules" (null/empty => unrestricted).
+  allowed_modules String[] @default([])
+
+  can_upload_pdf Boolean @default(false)
+  is_active      Boolean @default(true)
+
+  /// Set when an admin invites a user; cleared on first password set.
+  must_change_password Boolean   @default(false)
+  last_login_at        DateTime?
+
+  /// Any refresh token issued before this instant is rejected (logout-all / password change).
+  tokens_valid_from DateTime @default(now())
+
+  created_date DateTime @default(now())
+  updated_date DateTime @updatedAt
+  created_by   String?
+
+  refresh_tokens RefreshToken[]
+
+  @@map("users")
+}
+
+model RefreshToken {
+  id         String    @id @default(uuid())
+  user_id    String
+  token_hash String    @unique
+  expires_at DateTime
+  revoked_at DateTime?
+  user_agent String?
+
+  created_date DateTime @default(now())
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@map("refresh_tokens")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Application settings
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum EnvironmentName {
+  production
+  staging
+}
+
+model AppSettings {
+  id                        String          @id @default(uuid())
+  notifications_enabled     Boolean         @default(false)
+  days_before               Int             @default(7)
+  alert_emails              String[]        @default([])
+  environment_name          EnvironmentName @default(production)
+  environment_label_enabled Boolean         @default(false)
+
+  created_date DateTime @default(now())
+  updated_date DateTime @updatedAt
+  created_by   String?
+
+  @@map("app_settings")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Grants
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum GrantStatus {
+  active
+  pending
+  completed
+  cancelled
+  archived
+}
+
+enum ReportingCycle {
+  monthly
+  quarterly
+  bi_annual @map("bi-annual")
+  annual
+  ad_hoc    @map("ad-hoc")
+}
+
+model Grant {
+  id           String       @id @default(uuid())
+  title        String
+  funder       String?
+  grant_number String?
+  description  String?
+  total_amount Decimal?     @db.Decimal(18, 2)
+  start_date   DateTime?    @db.Date
+  end_date     DateTime?    @db.Date
+  status       GrantStatus  @default(active)
+  reporting_cycle ReportingCycle?
+  pdf_url      String?
+
+  /// [{ name, email, phone, role, organization, contact_type, is_active }]
+  /// Mandatory notification recipients for this grant.
+  contacts Json @default("[]")
+
+  notification_days_before Int     @default(7)
+  archived                 Boolean @default(false)
+
+  created_date DateTime @default(now())
+  updated_date DateTime @updatedAt
+  created_by   String?
+
+  milestones            Milestone[]
+  deliverables          GrantDeliverable[]
+  tranches              GrantTranche[]
+  reporting_obligations GrantReportingObligation[]
+  reporting_deadlines   ReportingDeadline[]
+  health_snapshots      GrantHealthScoreSnapshot[]
+  sows                  Sow[]
+
+  @@index([status])
+  @@index([archived])
+  @@map("grants")
+}
+
+enum MilestoneStatus {
+  pending
+  invoiced
+  paid
+  overdue
+}
+
+enum MilestoneType {
+  Payment
+  Reporting
+  Program
+  Compliance
+  Audit
+  Review
+  Other
+}
+
+model Milestone {
+  id             String          @id @default(uuid())
+  grant_id       String
+  title          String
+  description    String?
+  milestone_type MilestoneType   @default(Other)
+  amount         Decimal?        @db.Decimal(18, 2)
+  currency       String          @default("USD")
+  percentage     String?
+  due_date       DateTime?       @db.Date
+  paid_date      DateTime?       @db.Date
+  status         MilestoneStatus @default(pending)
+
+  acceptance_criteria   String?
+  source_section        String?
+  extraction_confidence Float?
+  extracted_from_pdf    Boolean @default(false)
+  source_document_id    String?
+  notes                 String?
+
+  created_date DateTime @default(now())
+  updated_date DateTime @updatedAt
+  created_by   String?
+
+  grant Grant @relation(fields: [grant_id], references: [id], onDelete: Cascade)
+
+  @@index([grant_id])
+  @@index([due_date])
+  @@map("milestones")
+}
+
+enum DeliverableStatus {
+  pending
+  in_progress
+  completed
+  overdue
+}
+
+enum Priority {
+  Low
+  Medium
+  High
+}
+
+enum GrantDeliverableCategory {
+  Program
+  Financial
+  Reporting
+  Compliance
+  Documentation
+  Technical
+  Other
+}
+
+model GrantDeliverable {
+  id          String                   @id @default(uuid())
+  grant_id    String
+  name        String
+  description String?
+  phase       String?
+  category    GrantDeliverableCategory @default(Other)
+  due_date    DateTime?                @db.Date
+  status      DeliverableStatus        @default(pending)
+
+  acceptance_criteria   String?
+  priority              Priority @default(Medium)
+  source_section        String?
+  extraction_confidence Float?
+  extracted_from_pdf    Boolean  @default(false)
+  source_document_id    String?
+  notes                 String?
+
+  created_date DateTime @default(now())
+  updated_date DateTime @updatedAt
+  created_by   String?
+
+  grant Grant @relation(fields: [grant_id], references: [id], onDelete: Cascade)
+
+  @@index([grant_id])
+  @@index([due_date])
+  @@map("grant_deliverables")
+}
+
+enum TrancheStatus {
+  pending
+  invoiced
+  received
+  overdue
+}
+
+model GrantTranche {
+  id           String   @id @default(uuid())
+  grant_id     String
+  tranche_name String
+  amount       Decimal? @db.Decimal(18, 2)
+
+  /// Date to raise the invoice (drives the payment_due notification rule).
+  invoice_trigger_date DateTime? @db.Date
+  due_date             DateTime? @db.Date
+  invoice_date         DateTime? @db.Date
+  received_date        DateTime? @db.Date
+
+  status TrancheStatus @default(pending)
+  notes  String?
+
+  created_date DateTime @default(now())
+  updated_date DateTime @updatedAt
+  created_by   String?
+
+  grant Grant @relation(fields: [grant_id], references: [id], onDelete: Cascade)
+
+  @@index([grant_id])
+  @@map("grant_tranches")
+}
+
+enum ObligationType {
+  Quarterly_Report @map("Quarterly Report")
+  Annual_Report    @map("Annual Report")
+  Audit_Submission @map("Audit Submission")
+  Ad_Hoc           @map("Ad Hoc")
+}
+
+enum ObligationStatus {
+  Pending
+  Submitted
+  Overdue
+}
+
+model GrantReportingObligation {
+  id              String           @id @default(uuid())
+  grant_id        String
+  obligation_name String
+  obligation_type ObligationType?
+  due_date        DateTime         @db.Date
+  submitted_date  DateTime?        @db.Date
+  status          ObligationStatus @default(Pending)
+  notes           String?
+
+  created_date DateTime @default(now())
+  updated_date DateTime @updatedAt
+  created_by   String?
+
+  grant Grant @relation(fields: [grant_id], references: [id], onDelete: Cascade)
+
+  @@index([grant_id])
+  @@index([due_date])
+  @@map("grant_reporting_obligations")
+}
+
+enum ReportingDeadlineStatus {
+  upcoming
+  submitted
+  overdue
+}
+
+model ReportingDeadline {
+  id          String                  @id @default(uuid())
+  grant_id    String
+  report_type String
+  due_date    DateTime                @db.Date
+  status      ReportingDeadlineStatus @default(upcoming)
+  notes       String?
+
+  created_date DateTime @default(now())
+  updated_date DateTime @updatedAt
+  created_by   String?
+
+  grant Grant @relation(fields: [grant_id], references: [id], onDelete: Cascade)
+
+  @@index([grant_id])
+  @@map("reporting_deadlines")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Grant health scoring
+// ─────────────────────────────────────────────────────────────────────────────
+
+model GrantHealthScoreConfig {
+  id             String  @id @default(uuid())
+  parameter_key  String  @unique
+  parameter_name String
+  weightage      Float
+  is_active      Boolean @default(true)
+  updated_by     String?
+
+  created_date DateTime @default(now())
+  updated_date DateTime @updatedAt
+  created_by   String?
+
+  @@map("grant_health_score_configs")
+}
+
+enum HealthStatus {
+  Green
+  Amber
+  Red
+}
+
+model GrantHealthScoreSnapshot {
+  id         String  @id @default(uuid())
+  grant_id   String
+  grant_name String?
+
+  milestone_score Float?
+  financial_score Float?
+  reporting_score Float?
+  document_score  Float?
+  timeline_score  Float?
+
+  milestone_weightage Float?
+  financial_weightage Float?
+  reporting_weightage Float?
+  document_weightage  Float?
+  timeline_weightage  Float?
+
+  milestone_weighted_score Float?
+  financial_weighted_score Float?
+  reporting_weighted_score Float?
+  document_weighted_score  Float?
+  timeline_weighted_score  Float?
+
+  overall_score   Float?
+  health_status   HealthStatus?
+  reasons         String[]      @default([])
+  calculated_date DateTime?
+
+  created_date DateTime @default(now())
+  updated_date DateTime @updatedAt
+  created_by   String?
+
+  grant Grant @relation(fields: [grant_id], references: [id], onDelete: Cascade)
+
+  @@index([grant_id])
+  @@map("grant_health_score_snapshots")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MOU
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum AgreementStatus {
+  active
+  expired
+  draft
+  terminated
+}
+
+enum PartnerType {
+  government
+  ngo
+  private
+  academic
+  multilateral
+  other
+}
+
+enum ReviewCycle {
+  six_months @map("6 months")
+  annual
+  bi_annual  @map("bi-annual")
+  as_needed  @map("as needed")
+}
+
+model Mou {
+  id           String       @id @default(uuid())
+  title        String
+  partner_name String
+  mou_number   String?
+  partner_type PartnerType?
+
+  partner_address               String?
+  partner_contact_name          String?
+  partner_contact_email         String?
+  partner_signatory_name        String?
+  partner_signatory_designation String?
+
+  our_contact_name          String?
+  our_contact_email         String?
+  our_signatory_name        String?
+  our_signatory_designation String?
+
+  signed_date        DateTime? @db.Date
+  effective_date     DateTime? @db.Date
+  end_date           DateTime? @db.Date
+  initial_term_years Float?
+
+  review_cycle ReviewCycle?
+  status       AgreementStatus @default(active)
+
+  purpose                String?
+  scope_of_collaboration String?
+  governing_law          String?
+  pdf_url                String?
+  notes                  String?
+  archived               Boolean @default(false)
+
+  /// [{ name, organization, role, email, phone, address, contact_type, extracted_from_pdf, is_active }]
+  contacts Json @default("[]")
+  /// [{ table_title, table_type, columns[], rows[], currency, billing_frequency, extraction_confidence, notes }]
+  rate_cards Json @default("[]")
+
+  created_date DateTime @default(now())
+  updated_date DateTime @updatedAt
+  created_by   String?
+
+  commitments MouCommitment[]
+
+  @@index([status])
+  @@index([archived])
+  @@map("mous")
+}
+
+enum CommitmentType {
+  Operational
+  Legal
+  Reporting
+  Financial
+  Confidentiality
+  Governance
+  Collaboration
+  Other
+}
+
+enum ResponsibleParty {
+  eGov
+  Partner
+  Both_Parties @map("Both Parties")
+  Other
+}
+
+model MouCommitment {
+  id              String            @id @default(uuid())
+  mou_id          String
+  name            String
+  description     String?
+  commitment_type CommitmentType    @default(Operational)
+  responsible_party ResponsibleParty @default(Both_Parties)
+  due_date        DateTime?         @db.Date
+  frequency       String?
+  status          DeliverableStatus @default(pending)
+
+  source_section        String?
+  source_clause         String?
+  source_page           String?
+  extraction_confidence Float?
+  extracted_from_pdf    Boolean @default(false)
+  source_document_id    String?
+  notes                 String?
+
+  created_date DateTime @default(now())
+  updated_date DateTime @updatedAt
+  created_by   String?
+
+  mou Mou @relation(fields: [mou_id], references: [id], onDelete: Cascade)
+
+  @@index([mou_id])
+  @@map("mou_commitments")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MSA
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Msa {
+  id          String  @id @default(uuid())
+  title       String
+  vendor_name String
+  msa_number  String?
+
+  vendor_address      String?
+  vendor_contact_name String?
+  vendor_contact_email String?
+  our_contact_name    String?
+  our_contact_email   String?
+
+  effective_date     DateTime?       @db.Date
+  end_date           DateTime?       @db.Date
+  initial_term_years Float?
+  status             AgreementStatus @default(active)
+
+  governing_law String?
+  auto_renew    Boolean @default(false)
+  notice_period String?
+  liability_cap String?
+  ip_ownership  String?
+  description   String?
+  key_terms     String?
+  pdf_url       String?
+  notes         String?
+  archived      Boolean @default(false)
+
+  /// [{ service_category, description, responsibility, limitations_or_notes, source_section, source_clause }]
+  structured_services Json @default("[]")
+  /// [{ name, email, phone, role, organization, contact_type, is_active }]
+  contacts Json @default("[]")
+
+  created_date DateTime @default(now())
+  updated_date DateTime @updatedAt
+  created_by   String?
+
+  key_clauses MsaKeyClause[]
+  sows        Sow[]
+
+  @@index([status])
+  @@index([archived])
+  @@map("msas")
+}
+
+enum ClauseType {
+  Commercial
+  Legal
+  Operational
+  Compliance
+  Risk
+  Other
+}
+
+enum RiskLevel {
+  Low
+  Medium
+  High
+}
+
+model MsaKeyClause {
+  id           String     @id @default(uuid())
+  msa_id       String
+  clause_title String
+  /// Legacy field retained for backwards compatibility with existing UI code.
+  clause_name  String?
+  clause_type  ClauseType @default(Legal)
+  clause_number String?
+  /// Legacy field retained for backwards compatibility with existing UI code.
+  clause_reference String?
+
+  summary   String?
+  full_text String?
+  risk_level RiskLevel @default(Medium)
+
+  obligation_owner   String?
+  notice_period_days String?
+  amount_or_cap      String?
+  source_section     String?
+  source_page        String?
+  confidence         Float?
+  extracted_from_pdf Boolean @default(false)
+  notes              String?
+
+  created_date DateTime @default(now())
+  updated_date DateTime @updatedAt
+  created_by   String?
+
+  msa Msa @relation(fields: [msa_id], references: [id], onDelete: Cascade)
+
+  @@index([msa_id])
+  @@map("msa_key_clauses")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SOW
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Sow {
+  id          String  @id @default(uuid())
+  title       String
+  vendor_name String
+  sow_number  String?
+  grant_id    String?
+  msa_id      String?
+
+  vendor_email String?
+  description  String?
+  start_date   DateTime?       @db.Date
+  end_date     DateTime?       @db.Date
+  status       AgreementStatus @default(active)
+
+  monthly_rate   Decimal? @db.Decimal(18, 2)
+  total_value    Decimal? @db.Decimal(18, 2)
+  payment_day    Int?
+  advance_amount Decimal? @db.Decimal(18, 2)
+
+  pdf_url  String?
+  notes    String?
+  archived Boolean @default(false)
+
+  /// [{ name, rate_per_month, allocation_percent, role }]
+  personnel Json @default("[]")
+  /// Extracted rate-card tables: [{ table_title, table_type, columns[], rows[], ... }]
+  rate_cards Json @default("[]")
+  commercial_tables Json @default("[]")
+  payment_schedule_tables Json @default("[]")
+  /// [{ role, rate, unit, currency }]
+  normalized_rate_items Json @default("[]")
+  /// [{ name, email, phone, role, organization, contact_type, is_active }]
+  contacts Json @default("[]")
+
+  created_date DateTime @default(now())
+  updated_date DateTime @updatedAt
+  created_by   String?
+
+  grant Grant? @relation(fields: [grant_id], references: [id], onDelete: SetNull)
+  msa   Msa?   @relation(fields: [msa_id], references: [id], onDelete: SetNull)
+
+  milestones   SowMilestone[]
+  deliverables SowDeliverable[]
+  invoices     SowInvoice[]
+
+  @@index([grant_id])
+  @@index([msa_id])
+  @@index([status])
+  @@index([archived])
+  @@map("sows")
+}
+
+enum SowMilestoneType {
+  Payment
+  Delivery
+  Review
+  Release
+  Support
+  Documentation
+  Other
+}
+
+model SowMilestone {
+  id             String           @id @default(uuid())
+  sow_id         String
+  title          String
+  description    String?
+  milestone_type SowMilestoneType @default(Payment)
+  due_date       DateTime?        @db.Date
+  percentage     String?
+  amount         Decimal?         @db.Decimal(18, 2)
+  currency       String           @default("USD")
+  status         MilestoneStatus  @default(pending)
+
+  acceptance_criteria   String?
+  source_section        String?
+  extraction_confidence Float?
+  extracted_from_pdf    Boolean @default(false)
+  source_document_id    String?
+  notes                 String?
+
+  created_date DateTime @default(now())
+  updated_date DateTime @updatedAt
+  created_by   String?
+
+  sow Sow @relation(fields: [sow_id], references: [id], onDelete: Cascade)
+
+  @@index([sow_id])
+  @@index([due_date])
+  @@map("sow_milestones")
+}
+
+enum SowDeliverableCategory {
+  Technical
+  Documentation
+  Support
+  Training
+  Configuration
+  Deployment
+  Reporting
+  Other
+}
+
+model SowDeliverable {
+  id          String                 @id @default(uuid())
+  sow_id      String
+  name        String
+  description String?
+  category    SowDeliverableCategory @default(Other)
+  due_date    DateTime?              @db.Date
+  status      DeliverableStatus      @default(pending)
+
+  acceptance_criteria   String?
+  priority              Priority @default(Medium)
+  source_section        String?
+  extraction_confidence Float?
+  extracted_from_pdf    Boolean  @default(false)
+  source_document_id    String?
+  notes                 String?
+
+  created_date DateTime @default(now())
+  updated_date DateTime @updatedAt
+  created_by   String?
+
+  sow Sow @relation(fields: [sow_id], references: [id], onDelete: Cascade)
+
+  @@index([sow_id])
+  @@index([due_date])
+  @@map("sow_deliverables")
+}
+
+enum InvoiceStatus {
+  draft
+  sent
+  paid
+  overdue
+}
+
+model SowInvoice {
+  id             String        @id @default(uuid())
+  sow_id         String
+  invoice_number String?
+  period         String?
+  amount         Decimal?      @db.Decimal(18, 2)
+  invoice_date   DateTime?     @db.Date
+  due_date       DateTime?     @db.Date
+  paid_date      DateTime?     @db.Date
+  status         InvoiceStatus @default(draft)
+  notes          String?
+
+  created_date DateTime @default(now())
+  updated_date DateTime @updatedAt
+  created_by   String?
+
+  sow Sow @relation(fields: [sow_id], references: [id], onDelete: Cascade)
+
+  @@index([sow_id])
+  @@index([due_date])
+  @@map("sow_invoices")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Documents
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum DocumentEntityType {
+  Grant
+  SOW
+  MSA
+  MOU
+}
+
+/// Physical uploaded file. Replaces Base44-hosted file URLs: the UI stores
+/// `/api/files/{id}/download` in *.pdf_url and the backend authorises reads.
+model StoredFile {
+  id            String  @id @default(uuid())
+  original_name String
+  /// Path on the uploads volume, relative to UPLOAD_DIR.
+  storage_path  String
+  mime_type     String
+  size_bytes    Int
+  /// SHA-256 of the file contents, used for duplicate detection.
+  sha256        String
+
+  entity_type DocumentEntityType?
+  entity_id   String?
+
+  uploaded_by String?
+
+  created_date DateTime @default(now())
+  updated_date DateTime @updatedAt
+  created_by   String?
+
+  @@index([sha256])
+  @@index([entity_type, entity_id])
+  @@map("stored_files")
+}
+
+model DocumentUploadLog {
+  id          String             @id @default(uuid())
+  file_name   String
+  file_url    String
+  file_hash   String?
+  entity_type DocumentEntityType
+  entity_id   String?
+  entity_name String?
+  uploaded_by String?
+
+  is_dpi_relevant     Boolean?
+  dpi_relevance_reason String?
+  is_duplicate        Boolean @default(false)
+  is_invalid          Boolean @default(false)
+  invalid_reason      String?
+  is_rejected         Boolean @default(false)
+  rejection_reason    String?
+
+  created_date DateTime @default(now())
+  updated_date DateTime @updatedAt
+  created_by   String?
+
+  @@index([entity_type, entity_id])
+  @@index([file_hash])
+  @@map("document_upload_logs")
+}
+
+enum SelectedModule {
+  Grant
+  SOW
+  MSA
+  MOU
+  Milestone
+  Deliverable
+  Invoice
+  ReportingObligation
+}
+
+enum ValidationStatus {
+  Valid
+  Invalid
+  Duplicate
+  PendingReview
+  NeedsReview
+  ForceApproved
+}
+
+enum ReviewAction {
+  approved
+  reclassified
+  deleted
+  force_approved
+}
+
+enum DeletionType {
+  admin_discard
+  duplicate_cleanup
+  invalid_file_cleanup
+  irrelevant_file_cleanup
+}
+
+model DocumentValidationLog {
+  id        String @id @default(uuid())
+  file_name String
+  file_url  String?
+  file_hash String?
+
+  selected_module    SelectedModule
+  linked_entity_id   String?
+  linked_entity_name String?
+
+  detected_document_type String?
+  validation_status      ValidationStatus @default(PendingReview)
+  confidence_score       Float?
+  rejection_reason       String?
+
+  /// { document_title, document_type, parties_involved, donor_funder, ... }
+  extracted_metadata Json?
+
+  duplicate_of_document_id String?
+  uploaded_by              String?
+  reviewed_by              String?
+  reviewed_date            DateTime?
+  review_action            ReviewAction?
+  force_approved_reason    String?
+  reclassified_to          String?
+
+  is_deleted          Boolean       @default(false)
+  deleted_by          String?
+  deleted_date        DateTime?
+  deletion_reason     String?
+  deletion_type       DeletionType?
+  deleted_from_section String?
+
+  created_date DateTime @default(now())
+  updated_date DateTime @updatedAt
+  created_by   String?
+
+  @@index([validation_status])
+  @@index([is_deleted])
+  @@index([file_hash])
+  @@map("document_validation_logs")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Notifications
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum TriggerType {
+  milestone_due
+  deliverable_due
+  reporting_due
+  payment_due
+  contract_expiry
+  document_review
+}
+
+model NotificationRule {
+  name                   String
+  id                     String      @id @default(uuid())
+  trigger_type           TriggerType
+  /// Days before the due date to send a reminder, e.g. [30, 15, 7, 1, 0].
+  reminder_days_before   Int[]       @default([])
+  /// How often (days) to repeat overdue reminders. 0 = disabled.
+  overdue_frequency_days Int         @default(7)
+  is_enabled             Boolean     @default(true)
+
+  template_type_upcoming String?
+  template_type_overdue  String?
+
+  created_date DateTime @default(now())
+  updated_date DateTime @updatedAt
+  created_by   String?
+
+  @@map("notification_rules")
+}
+
+enum TemplateType {
+  milestone_upcoming
+  milestone_overdue
+  deliverable_upcoming
+  deliverable_overdue
+  reporting_upcoming
+  reporting_overdue
+  payment_upcoming
+  payment_overdue
+  contract_expiry
+  document_review
+  test_email
+}
+
+model NotificationTemplate {
+  id            String       @id @default(uuid())
+  name          String
+  template_type TemplateType
+  subject       String
+  body          String
+  is_active     Boolean      @default(true)
+
+  created_date DateTime @default(now())
+  updated_date DateTime @updatedAt
+  created_by   String?
+
+  @@map("notification_templates")
+}
+
+enum NotificationType {
+  upcoming
+  overdue
+  test
+}
+
+enum RecipientSource {
+  Record_Contact       @map("Record Contact")
+  Additional_Recipient @map("Additional Recipient")
+}
+
+enum NotificationStatus {
+  sent
+  failed
+  skipped
+}
+
+model NotificationLog {
+  id                String           @id @default(uuid())
+  rule_id           String
+  rule_name         String
+  notification_type NotificationType @default(upcoming)
+
+  record_type String?
+  record_id   String?
+  item_type   String?
+  item_id     String
+  item_title  String
+
+  recipient_email  String
+  recipient_source RecipientSource?
+
+  scheduled_for_date DateTime           @db.Date
+  sent_date          DateTime?
+  status             NotificationStatus @default(sent)
+  error_message      String?
+  retry_count        Int                @default(0)
+
+  is_test      Boolean @default(false)
+  initiated_by String?
+
+  created_date DateTime @default(now())
+  updated_date DateTime @updatedAt
+  created_by   String?
+
+  /// Idempotency guard: one send per rule+item+recipient+day.
+  /// Replaces the Base44 implementation's read-then-filter dedup, which could
+  /// double-send under concurrent runs.
+  @@unique([rule_id, item_id, recipient_email, scheduled_for_date, is_test], name: "notification_dedup")
+  @@index([scheduled_for_date])
+  @@index([status])
+  @@map("notification_logs")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Audit & maintenance
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum AuditStatus {
+  success
+  warning
+  error
+}
+
+model AuditLog {
+  id          String  @id @default(uuid())
+  action_type String
+  entity_type String?
+  entity_id   String?
+  entity_name String?
+  grant_id    String?
+  user_email  String?
+  user_name   String?
+  old_value   String?
+  new_value   String?
+  description String?
+  status      AuditStatus @default(success)
+
+  created_date DateTime @default(now())
+  updated_date DateTime @updatedAt
+  created_by   String?
+
+  @@index([entity_type, entity_id])
+  @@index([created_date])
+  @@map("audit_logs")
+}
+
+enum CleanupType {
+  file_cleanup
+  full_cleanup
+}
+
+enum CleanupScope {
+  files_only
+  files_and_validation_logs
+  files_metadata_and_tables
+  files_and_extracted_items
+  full_file_cleanup
+}
+
+enum CleanupStatus {
+  running
+  completed
+  failed
+}
+
+model CleanupLog {
+  id            String        @id @default(uuid())
+  cleanup_type  CleanupType?
+  cleanup_scope CleanupScope
+  initiated_by  String?
+  initiated_by_email String
+  started_at    DateTime?
+  completed_at  DateTime?
+  status        CleanupStatus @default(running)
+
+  files_deleted_count           Int @default(0)
+  document_logs_deleted_count   Int @default(0)
+  validation_logs_deleted_count Int @default(0)
+  metadata_cleared_count        Int @default(0)
+  records_updated_count         Int @default(0)
+  extracted_items_deleted_count Int @default(0)
+
+  errors          String[] @default([])
+  backup_exported Boolean  @default(false)
+  summary         String?
+
+  created_date DateTime @default(now())
+  updated_date DateTime @updatedAt
+  created_by   String?
+
+  @@map("cleanup_logs")
+}

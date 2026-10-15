@@ -1,0 +1,51 @@
+import { Body, Controller, Get, HttpCode, Post, UseGuards } from '@nestjs/common';
+import { CurrentUser, Roles, type AuthenticatedUser } from '../common/decorators';
+import { JwtAuthGuard, RolesGuard } from '../common/guards';
+import { MailerService } from './mailer.service';
+import { NotificationsService } from './notifications.service';
+
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles('admin')
+@Controller('notifications')
+export class NotificationsController {
+  constructor(
+    private readonly notifications: NotificationsService,
+    private readonly mailer: MailerService,
+  ) {}
+
+  /** SMTP reachability — surfaced on the Settings page. */
+  @Get('status')
+  status() {
+    return this.mailer.status;
+  }
+
+  /**
+   * Runs the daily notification pass immediately.
+   * Replaces the Base44 `sendNotifications` function invoked by the UI.
+   */
+  @Post('run')
+  @HttpCode(200)
+  run(@Body() body: { dry_run?: boolean }) {
+    return this.notifications.processNotifications({ dryRun: body?.dry_run === true });
+  }
+
+  /** Replaces the Base44 `sendTestNotification` function. */
+  @Post('test')
+  @HttpCode(200)
+  test(@Body() body: any, @CurrentUser() user: AuthenticatedUser) {
+    return this.notifications.sendTestNotification(body ?? {}, {
+      email: user.email,
+      name: user.display_name ?? user.full_name ?? '',
+    });
+  }
+
+  /** Plain "does SMTP work" check for the Settings page. */
+  @Post('test-simple')
+  @HttpCode(200)
+  testSimple(
+    @Body() body: { recipients?: string[] },
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.notifications.sendSimpleTestEmail(body?.recipients ?? [], user.email);
+  }
+}
