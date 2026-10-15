@@ -16,7 +16,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { FileInterceptor } from '@nestjs/platform-express';
 import type { Response } from 'express';
-import { CurrentUser, Roles, type AuthenticatedUser } from '../common/decorators';
+import { CurrentUser, Public, Roles, type AuthenticatedUser } from '../common/decorators';
 import { JwtAuthGuard, RolesGuard } from '../common/guards';
 import { FileSessionGuard } from './file-session.guard';
 import { FilesService } from './files.service';
@@ -63,6 +63,10 @@ export class FilesController {
    * cookie set at login, because the UI opens documents with a plain
    * `<a href target="_blank">` which cannot carry an Authorization header.
    */
+  // @Public() only exempts the route from the *global* bearer-token guard;
+  // FileSessionGuard below still authenticates every request. Without this the
+  // global guard rejects cookie-authenticated downloads before this guard runs.
+  @Public()
   @UseGuards(FileSessionGuard)
   @Get(':id/download')
   async download(

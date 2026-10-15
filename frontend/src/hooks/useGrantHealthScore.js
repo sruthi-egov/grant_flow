@@ -3,7 +3,7 @@
  * All score calculation logic lives here to avoid duplication.
  */
 
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { differenceInDays, parseISO } from "date-fns";
 
 export const DEFAULT_WEIGHTS = {
@@ -24,7 +24,7 @@ export const PARAM_LABELS = {
 
 /** Load saved weightage config from DB, falling back to defaults. */
 export async function loadWeightConfig() {
-  const records = await base44.entities.GrantHealthScoreConfig.list();
+  const records = await api.entities.GrantHealthScoreConfig.list();
   if (!records || records.length === 0) return { ...DEFAULT_WEIGHTS };
   const weights = { ...DEFAULT_WEIGHTS };
   records.forEach(r => {

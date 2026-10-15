@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -19,7 +19,7 @@ export default function CleanupLogsViewer() {
 
   const load = async () => {
     setLoading(true);
-    const data = await base44.entities.CleanupLog.list("-created_date", 20);
+    const data = await api.entities.CleanupLog.list("-created_date", 20);
     setLogs(data);
     setLoading(false);
   };

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -16,7 +16,7 @@ export default function EnvironmentSettings({ settingsId, onSaved }) {
   const [localId, setLocalId] = useState(settingsId);
 
   useEffect(() => {
-    base44.entities.AppSettings.list().then(s => {
+    api.entities.AppSettings.list().then(s => {
       if (s.length > 0) {
         setEnvName(s[0].environment_name || "production");
         setLabelEnabled(s[0].environment_label_enabled || false);
@@ -29,9 +29,9 @@ export default function EnvironmentSettings({ settingsId, onSaved }) {
     setSaving(true);
     const data = { environment_name: envName, environment_label_enabled: labelEnabled };
     if (localId) {
-      await base44.entities.AppSettings.update(localId, data);
+      await api.entities.AppSettings.update(localId, data);
     } else {
-      const created = await base44.entities.AppSettings.create({ ...data, notifications_enabled: false, days_before: 7 });
+      const created = await api.entities.AppSettings.create({ ...data, notifications_enabled: false, days_before: 7 });
       setLocalId(created.id);
     }
     setSaving(false);
@@ -57,8 +57,8 @@ export default function EnvironmentSettings({ settingsId, onSaved }) {
         <div className="flex items-start gap-3 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800">
           <Info className="w-4 h-4 shrink-0 mt-0.5 text-blue-600" />
           <div>
-            <p className="font-semibold">Base44 Staging/Production Approach</p>
-            <p className="text-xs mt-1">Base44 does not have a built-in staging/production environment switch. The recommended approach is to <strong>clone this app</strong> (from your Apps dashboard → ⋯ → Clone App) and label one as Staging and one as Production. Use the Staging clone for testing, and keep Production for live clean data. Each clone has its own isolated database.</p>
+            <p className="font-semibold">Staging / Production Approach</p>
+            <p className="text-xs mt-1">This label is cosmetic — it only controls the banner shown in the app header. Environments are separated by <strong>deployment</strong>: run a second instance with its own <code>DATABASE_URL</code> and upload volume (a separate Docker Compose project locally, or a separate Kubernetes namespace). Each instance then has a fully isolated database and document store.</p>
           </div>
         </div>
 

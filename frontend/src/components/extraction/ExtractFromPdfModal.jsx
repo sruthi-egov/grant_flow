@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -50,7 +50,7 @@ export default function ExtractFromPdfModal({ open, onClose, parentType, parentI
 
     try {
       setProgressMsg("Extracting deliverables and milestones using AI...");
-      const res = await base44.functions.invoke("extractDeliverablesAndMilestones", {
+      const res = await api.functions.invoke("extractDeliverablesAndMilestones", {
         pdf_url: pdfUrl,
         parent_type: parentType,
         parent_id: parentId,
@@ -149,9 +149,9 @@ export default function ExtractFromPdfModal({ open, onClose, parentType, parentI
         };
         try {
           if (isSow) {
-            await base44.entities.SowDeliverable.create({ ...record, sow_id: parentId });
+            await api.entities.SowDeliverable.create({ ...record, sow_id: parentId });
           } else {
-            await base44.entities.GrantDeliverable.create({ ...record, grant_id: parentId });
+            await api.entities.GrantDeliverable.create({ ...record, grant_id: parentId });
           }
           savedD++;
         } catch (e) {
@@ -183,9 +183,9 @@ export default function ExtractFromPdfModal({ open, onClose, parentType, parentI
         };
         try {
           if (isSow) {
-            await base44.entities.SowMilestone.create({ ...record, sow_id: parentId });
+            await api.entities.SowMilestone.create({ ...record, sow_id: parentId });
           } else {
-            await base44.entities.Milestone.create({ ...record, grant_id: parentId });
+            await api.entities.Milestone.create({ ...record, grant_id: parentId });
           }
           savedM++;
         } catch (e) {

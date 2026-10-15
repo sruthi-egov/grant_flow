@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Upload, FilePlus } from "lucide-react";
@@ -18,7 +18,7 @@ export default function AddMsaModal({ onClose, onSaved }) {
   };
 
   const handleSave = async (formData) => {
-    await base44.entities.MSA.create({
+    await api.entities.MSA.create({
       ...formData,
       pdf_url: pdfUrl || formData.pdf_url || "",
     });

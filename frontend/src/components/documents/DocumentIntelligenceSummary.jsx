@@ -2,7 +2,7 @@
  * Small dashboard widget showing document intelligence summary.
  */
 import { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FileText, CheckCircle2, XCircle, AlertTriangle } from "lucide-react";
 import { Link } from "react-router-dom";
@@ -15,7 +15,7 @@ export default function DocumentIntelligenceSummary() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    base44.entities.DocumentValidationLog.list("-created_date", 500).then(docs => {
+    api.entities.DocumentValidationLog.list("-created_date", 500).then(docs => {
       setStats({
         total: docs.length,
         valid: docs.filter(d => d.validation_status === "Valid" || d.validation_status === "ForceApproved").length,

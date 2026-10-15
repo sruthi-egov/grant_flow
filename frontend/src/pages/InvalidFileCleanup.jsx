@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -56,7 +56,7 @@ export default function InvalidFileCleanup() {
 
   const fetchDocs = async () => {
     setLoading(true);
-    const all = await base44.entities.DocumentValidationLog.list("-created_date", 500);
+    const all = await api.entities.DocumentValidationLog.list("-created_date", 500);
     // Exclude soft-deleted and safe-status docs
     const filtered = all.filter(d =>
       !d.is_deleted &&
@@ -67,7 +67,7 @@ export default function InvalidFileCleanup() {
   };
 
   useEffect(() => {
-    base44.auth.me().then(setUser).catch(() => setUser({}));
+    api.auth.me().then(setUser).catch(() => setUser({}));
     fetchDocs();
   }, []);
 
@@ -119,7 +119,7 @@ export default function InvalidFileCleanup() {
       return;
     }
     setDeleting(true);
-    await base44.entities.DocumentValidationLog.update(deleteDoc.id, {
+    await api.entities.DocumentValidationLog.update(deleteDoc.id, {
       is_deleted: true,
       deleted_by: user.email,
       deleted_date: new Date().toISOString(),
@@ -150,7 +150,7 @@ export default function InvalidFileCleanup() {
     const skipped = selectedDocs.length - eligible.length;
 
     await Promise.all(eligible.map(doc =>
-      base44.entities.DocumentValidationLog.update(doc.id, {
+      api.entities.DocumentValidationLog.update(doc.id, {
         is_deleted: true,
         deleted_by: user.email,
         deleted_date: new Date().toISOString(),

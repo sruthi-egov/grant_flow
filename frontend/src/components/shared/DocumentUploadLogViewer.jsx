@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,7 +13,7 @@ export default function DocumentUploadLogViewer() {
   const [deleting, setDeleting] = useState(null);
 
   const fetchLogs = () => {
-    base44.entities.DocumentUploadLog.list("-created_date", 200)
+    api.entities.DocumentUploadLog.list("-created_date", 200)
       .then(data => { setLogs(data); setLoading(false); })
       .catch(() => setLoading(false));
   };
@@ -23,7 +23,7 @@ export default function DocumentUploadLogViewer() {
   const handleDelete = async (id) => {
     if (!window.confirm("Delete this document log entry? This cannot be undone.")) return;
     setDeleting(id);
-    await base44.entities.DocumentUploadLog.delete(id);
+    await api.entities.DocumentUploadLog.delete(id);
     setLogs(prev => prev.filter(l => l.id !== id));
     setDeleting(null);
   };

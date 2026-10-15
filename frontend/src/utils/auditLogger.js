@@ -3,12 +3,12 @@
  * Call logAudit() from anywhere to create an AuditLog record.
  * Non-blocking — failures are silently swallowed.
  */
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 
 export async function logAudit({ action_type, entity_type, entity_id, entity_name, grant_id, description, old_value, new_value, status = "success" }) {
   try {
-    const user = await base44.auth.me().catch(() => null);
-    await base44.entities.AuditLog.create({
+    const user = await api.auth.me().catch(() => null);
+    await api.entities.AuditLog.create({
       action_type,
       entity_type: entity_type || "",
       entity_id: entity_id || "",

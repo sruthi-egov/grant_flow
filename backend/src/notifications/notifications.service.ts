@@ -634,6 +634,65 @@ ${rendered.body}`;
     };
   }
 
+  /**
+   * Sends one ad-hoc email on behalf of an admin.
+   * Replaces the client-side `integrations.Core.SendEmail` calls; plain-text
+   * bodies are wrapped so line breaks survive as HTML.
+   */
+  async sendAdHocEmail(
+    body: { to: string; subject: string; body: string; from_name?: string },
+    initiatedBy: string,
+  ) {
+    const to = normalizeEmail(body?.to);
+    if (!isValidEmail(to)) {
+      throw new BadRequestException(`"${body?.to}" is not a valid email address`);
+    }
+    if (!body?.subject?.trim()) {
+      throw new BadRequestException('subject is required');
+    }
+
+    const looksLikeHtml = /<[a-z][\s\S]*>/i.test(body.body ?? '');
+    const html = looksLikeHtml
+      ? body.body
+      : `<div style="font-family: sans-serif; white-space: pre-wrap;">${(body.body ?? '')
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')}</div>`;
+
+    const result = await this.mailer.send({
+      to,
+      subject: body.subject,
+      html,
+      fromName: body.from_name,
+    });
+
+    const today = todayInKolkata(this.config.get<string>('notifications.timezone') ?? 'Asia/Kolkata');
+    await this.prisma.notificationLog
+      .create({
+        data: {
+          rule_id: 'manual',
+          rule_name: 'Manual Email',
+          notification_type: 'test',
+          item_id: `manual_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+          item_title: body.subject.slice(0, 500),
+          recipient_email: to,
+          recipient_source: 'Additional_Recipient',
+          scheduled_for_date: new Date(`${today}T00:00:00.000Z`),
+          sent_date: new Date(),
+          status: result.status,
+          error_message: result.error ?? null,
+          is_test: true,
+          initiated_by: initiatedBy,
+        },
+      })
+      .catch(() => undefined);
+
+    if (result.status === 'failed') {
+      throw new BadRequestException(`Email could not be sent: ${result.error}`);
+    }
+    return { status: result.status, to, error: result.error ?? null };
+  }
+
   /** Simple "is SMTP working" probe used by the Settings page. */
   async sendSimpleTestEmail(recipients: string[], initiatedBy: string) {
     const timezone = this.config.get<string>('notifications.timezone') ?? 'Asia/Kolkata';

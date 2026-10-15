@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -34,14 +34,14 @@ export default function MSADetail() {
   const [showEdit, setShowEdit] = useState(false);
 
   useEffect(() => {
-    base44.auth.me().then(setUser).catch(() => {});
+    api.auth.me().then(setUser).catch(() => {});
     if (msaId) fetchData();
   }, [msaId]);
 
   const fetchData = async () => {
     const [data, sows] = await Promise.all([
-      base44.entities.MSA.filter({ id: msaId }),
-      base44.entities.SOW.filter({ msa_id: msaId }),
+      api.entities.MSA.filter({ id: msaId }),
+      api.entities.SOW.filter({ msa_id: msaId }),
     ]);
     setMsa(data[0] || null);
     setLinkedSows(sows);
@@ -49,13 +49,13 @@ export default function MSADetail() {
   };
 
   const handleSave = async (formData) => {
-    await base44.entities.MSA.update(msa.id, formData);
+    await api.entities.MSA.update(msa.id, formData);
     setShowEdit(false);
     fetchData();
   };
 
   const handleArchive = async () => {
-    await base44.entities.MSA.update(msa.id, { archived: true });
+    await api.entities.MSA.update(msa.id, { archived: true });
     window.location.href = createPageUrl("MSAs");
   };
 

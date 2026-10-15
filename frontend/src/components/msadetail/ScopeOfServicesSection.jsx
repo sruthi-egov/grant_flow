@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ChevronDown, ChevronUp, Layers, Loader2, FileText, AlertTriangle } from "lucide-react";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 
 function parseDescriptionIntoServices(text) {
   if (!text) return [];
@@ -158,7 +158,7 @@ export default function ScopeOfServicesSection({ msa, isAdmin, onServicesUpdated
     }
     setExtracting(true);
     setExtractError("");
-    const res = await base44.functions.invoke("extractMsaServicesAndKeyClauses", {
+    const res = await api.functions.invoke("extractMsaServicesAndKeyClauses", {
       pdf_url: msa.pdf_url,
       msa_id: msa.id,
     });
@@ -173,7 +173,7 @@ export default function ScopeOfServicesSection({ msa, isAdmin, onServicesUpdated
   };
 
   const handleSaveServices = async (services) => {
-    await base44.entities.MSA.update(msa.id, { structured_services: services });
+    await api.entities.MSA.update(msa.id, { structured_services: services });
     setReviewServices(null);
     if (onServicesUpdated) onServicesUpdated();
   };

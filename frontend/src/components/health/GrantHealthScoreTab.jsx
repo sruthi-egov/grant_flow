@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -24,11 +24,11 @@ export default function GrantHealthScoreTab({ grantId, grant }) {
   const calculate = async () => {
     setRecalcing(true);
     const [milestones, tranches, obligations, uploadLogs, deliverables, weights] = await Promise.all([
-      base44.entities.Milestone.filter({ grant_id: grantId }),
-      base44.entities.GrantTranche.filter({ grant_id: grantId }),
-      base44.entities.GrantReportingObligation.filter({ grant_id: grantId }),
-      base44.entities.DocumentUploadLog.filter({ entity_id: grantId }),
-      base44.entities.GrantDeliverable.filter({ grant_id: grantId }),
+      api.entities.Milestone.filter({ grant_id: grantId }),
+      api.entities.GrantTranche.filter({ grant_id: grantId }),
+      api.entities.GrantReportingObligation.filter({ grant_id: grantId }),
+      api.entities.DocumentUploadLog.filter({ entity_id: grantId }),
+      api.entities.GrantDeliverable.filter({ grant_id: grantId }),
       loadWeightConfig(),
     ]);
 

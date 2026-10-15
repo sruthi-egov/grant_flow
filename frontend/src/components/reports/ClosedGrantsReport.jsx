@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { format, parseISO, differenceInMonths } from "date-fns";
@@ -15,9 +15,9 @@ export default function ClosedGrantsReport() {
 
   useEffect(() => {
     Promise.all([
-      base44.entities.Grant.list("-created_date", 500),
-      base44.entities.GrantTranche.list("due_date", 500),
-      base44.entities.GrantDeliverable.list("due_date", 500),
+      api.entities.Grant.list("-created_date", 500),
+      api.entities.GrantTranche.list("due_date", 500),
+      api.entities.GrantDeliverable.list("due_date", 500),
     ]).then(([g,tr,d]) => { setGrants(g); setTranches(tr); setDeliverables(d); setLoading(false); });
   }, []);
 

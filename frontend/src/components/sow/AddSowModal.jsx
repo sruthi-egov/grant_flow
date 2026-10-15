@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
@@ -33,7 +33,7 @@ export default function AddSowModal({ grants, onClose, onSaved }) {
       status: formData.status || "active",
       archived: false,
     };
-    const created = await base44.entities.SOW.create(mergedData);
+    const created = await api.entities.SOW.create(mergedData);
     setSaving(false);
     onSaved(created);
   };

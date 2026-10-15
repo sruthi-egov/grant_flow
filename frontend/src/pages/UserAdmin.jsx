@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -50,8 +50,8 @@ export default function UserAdmin() {
 
   const loadData = async () => {
     const [allUsers, me] = await Promise.all([
-      base44.entities.User.list(),
-      base44.auth.me(),
+      api.entities.User.list(),
+      api.auth.me(),
     ]);
     setUsers(allUsers);
     setCurrentUser(me);
@@ -98,16 +98,16 @@ export default function UserAdmin() {
   const handleInvite = async () => {
     if (!inviteEmail) return;
     setInviting(true);
-    await base44.users.inviteUser(inviteEmail, inviteRole);
+    await api.users.inviteUser(inviteEmail, inviteRole);
 
     if (inviteRole !== "admin") {
       let newUser = null;
       for (let attempt = 0; attempt < 5; attempt++) {
         await new Promise(r => setTimeout(r, 500));
-        const allUsers = await base44.entities.User.list();
+        const allUsers = await api.entities.User.list();
         newUser = allUsers.find(u => u.email === inviteEmail);
         if (newUser) {
-          await base44.entities.User.update(newUser.id, {
+          await api.entities.User.update(newUser.id, {
             allowed_modules: inviteModules,
             can_upload_pdf: inviteCanUploadPdf,
             is_active: true,
@@ -122,7 +122,7 @@ export default function UserAdmin() {
         if (attempt === 4) setUsers(allUsers);
       }
     } else {
-      const allUsers = await base44.entities.User.list();
+      const allUsers = await api.entities.User.list();
       setUsers(allUsers);
     }
 
@@ -143,7 +143,7 @@ export default function UserAdmin() {
   const handleResendInvite = async (user) => {
     setResending(s => ({ ...s, [user.id]: true }));
     try {
-      await base44.users.inviteUser(user.email, user.role || "user");
+      await api.users.inviteUser(user.email, user.role || "user");
       toast.success(`Invitation resent to ${user.email}.`);
     } catch {
       toast.error("Unable to resend invitation. Please try again.");
@@ -153,7 +153,7 @@ export default function UserAdmin() {
 
   const saveEditUser = async () => {
     setEditSaving(true);
-    await base44.entities.User.update(editUser.id, { display_name: editName });
+    await api.entities.User.update(editUser.id, { display_name: editName });
     setUsers(prev => prev.map(u => u.id === editUser.id ? { ...u, display_name: editName } : u));
     toast.success("Name updated successfully");
     setEditUser(null);
@@ -167,7 +167,7 @@ export default function UserAdmin() {
   const saveUser = async (user) => {
     setSaving(s => ({ ...s, [user.id]: true }));
     try {
-      await base44.entities.User.update(user.id, {
+      await api.entities.User.update(user.id, {
         allowed_modules: user.allowed_modules,
         can_upload_pdf: user.can_upload_pdf ?? false,
       });
@@ -206,12 +206,12 @@ export default function UserAdmin() {
 
     try {
       const newIsActive = type === "enable";
-      await base44.entities.User.update(user.id, { is_active: newIsActive });
+      await api.entities.User.update(user.id, { is_active: newIsActive });
       setUsers(prev => prev.map(u => u.id === user.id ? { ...u, is_active: newIsActive } : u));
 
       // Audit log
       try {
-        await base44.entities.AuditLog.create({
+        await api.entities.AuditLog.create({
           action_type: type === "disable" ? "user_disabled" : "user_enabled",
           entity_type: "User",
           entity_id: user.id,

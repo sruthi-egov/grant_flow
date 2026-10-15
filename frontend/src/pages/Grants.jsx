@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -25,8 +25,8 @@ export default function Grants() {
   const fetchAll = useCallback(async () => {
     setLoading(true);
     const [u, data] = await Promise.all([
-      base44.auth.me().catch(() => null),
-      base44.entities.Grant.list("-created_date", 100),
+      api.auth.me().catch(() => null),
+      api.entities.Grant.list("-created_date", 100),
     ]);
     setUser(u);
     setGrants(data);
@@ -36,7 +36,7 @@ export default function Grants() {
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
   const archiveGrant = async (grant) => {
-    await base44.entities.Grant.update(grant.id, { archived: true });
+    await api.entities.Grant.update(grant.id, { archived: true });
     setGrants(prev => prev.filter(g => g.id !== grant.id));
   };
 

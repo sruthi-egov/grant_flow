@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -36,29 +36,29 @@ export default function SOWDetail() {
   const [showEdit, setShowEdit] = useState(false);
 
   useEffect(() => {
-    base44.auth.me().then(setUser).catch(() => {});
+    api.auth.me().then(setUser).catch(() => {});
     if (sowId) fetchSow();
   }, [sowId]);
 
   const fetchSow = async () => {
-    const data = await base44.entities.SOW.filter({ id: sowId });
+    const data = await api.entities.SOW.filter({ id: sowId });
     const s = data[0];
     setSow(s || null);
     if (s?.grant_id) {
-      const grants = await base44.entities.Grant.filter({ id: s.grant_id });
+      const grants = await api.entities.Grant.filter({ id: s.grant_id });
       setGrant(grants[0] || null);
     }
     setLoading(false);
   };
 
   const handleSave = async (formData) => {
-    await base44.entities.SOW.update(sow.id, formData);
+    await api.entities.SOW.update(sow.id, formData);
     setShowEdit(false);
     fetchSow();
   };
 
   const handleArchive = async () => {
-    await base44.entities.SOW.update(sow.id, { archived: true });
+    await api.entities.SOW.update(sow.id, { archived: true });
     window.location.href = createPageUrl("SOWs");
   };
 

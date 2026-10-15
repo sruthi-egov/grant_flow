@@ -1,20 +1,46 @@
-import base44 from "@base44/vite-plugin"
 import react from '@vitejs/plugin-react'
+import path from 'node:path'
 import { defineConfig } from 'vite'
 
-// https://vite.dev/config/
+// The Base44 vite plugin has been removed along with the SDK. Nothing in this
+// build talks to Base44.
 export default defineConfig({
-  logLevel: 'error', // Suppress warnings, only show errors
-  plugins: [
-    base44({
-      // Support for legacy code that imports the base44 SDK with @/integrations, @/entities, etc.
-      // can be removed if the code has been updated to use the new SDK imports from @base44/sdk
-      legacySDKImports: process.env.BASE44_LEGACY_SDK_IMPORTS === 'true',
-      hmrNotifier: true,
-      navigationNotifier: true,
-      analyticsTracker: true,
-      visualEditAgent: true
-    }),
-    react(),
-  ]
+  plugins: [react()],
+
+  resolve: {
+    alias: {
+      '@': path.resolve(__dirname, './src'),
+    },
+  },
+
+  server: {
+    port: 5173,
+    strictPort: true,
+    proxy: {
+      // Same-origin /api keeps the httpOnly session cookie working for
+      // document downloads (opened as plain links, which cannot carry an
+      // Authorization header) and sidesteps CORS entirely in development.
+      '/api': {
+        target: process.env.VITE_API_PROXY_TARGET || 'http://localhost:3001',
+        changeOrigin: true,
+        secure: false,
+      },
+    },
+  },
+
+  preview: {
+    port: 4173,
+    proxy: {
+      '/api': {
+        target: process.env.VITE_API_PROXY_TARGET || 'http://localhost:3001',
+        changeOrigin: true,
+      },
+    },
+  },
+
+  build: {
+    outDir: 'dist',
+    sourcemap: false,
+    chunkSizeWarningLimit: 1500,
+  },
 });

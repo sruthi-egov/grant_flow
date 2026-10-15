@@ -2,7 +2,7 @@
  * Document Intelligence — validation, classification, metadata extraction.
  * Shared utility used by all module uploaders.
  */
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { logAudit } from "./auditLogger";
 
 /**
@@ -90,7 +90,7 @@ export async function computeFileHash(file) {
 /** Check duplicate by hash in DocumentValidationLog */
 export async function checkDuplicate(hash) {
   try {
-    const logs = await base44.entities.DocumentValidationLog.filter({ file_hash: hash });
+    const logs = await api.entities.DocumentValidationLog.filter({ file_hash: hash });
     return logs.length > 0 ? logs[0] : null;
   } catch {
     return null;
@@ -143,7 +143,7 @@ function resolveValidationStatus(isValid, validationReason, rejectionReason, con
 export async function validateAndClassifyDocument(fileUrl, selectedModule) {
   const keywords = MODULE_KEYWORDS[selectedModule] || [];
 
-  const result = await base44.integrations.Core.InvokeLLM({
+  const result = await api.integrations.Core.InvokeLLM({
     prompt: `You are a document intelligence system. Analyze this PDF document for the module: "${selectedModule}".
 
 IMPORTANT INSTRUCTIONS:
@@ -225,7 +225,7 @@ Return JSON with this exact structure:
  * Returns { isValid, isDuplicate, validationLog, metadata, detectedType, confidenceScore, rejectionReason, validationStatus }
  */
 export async function processDocumentUpload({ file, fileUrl, selectedModule, linkedEntityId, linkedEntityName }) {
-  const user = await base44.auth.me().catch(() => null);
+  const user = await api.auth.me().catch(() => null);
   const hash = await computeFileHash(file);
 
   // 1. Duplicate check
@@ -270,7 +270,7 @@ export async function processDocumentUpload({ file, fileUrl, selectedModule, lin
 
   let validationLog = null;
   try {
-    validationLog = await base44.entities.DocumentValidationLog.create(logData);
+    validationLog = await api.entities.DocumentValidationLog.create(logData);
   } catch {
     // non-blocking
   }

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { DollarSign, Calendar, Hash, FileText, ExternalLink, TrendingUp } from "lucide-react";
@@ -18,8 +18,8 @@ export default function GrantOverview({ grant }) {
 
   useEffect(() => {
     Promise.all([
-      base44.entities.GrantTranche.filter({ grant_id: grant.id }, "due_date"),
-      base44.entities.Milestone.filter({ grant_id: grant.id }),
+      api.entities.GrantTranche.filter({ grant_id: grant.id }, "due_date"),
+      api.entities.Milestone.filter({ grant_id: grant.id }),
     ]).then(([t, m]) => { setTranches(t); setMilestones(m); });
   }, [grant.id]);
 

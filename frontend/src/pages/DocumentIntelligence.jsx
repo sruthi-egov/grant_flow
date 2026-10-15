@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -39,13 +39,13 @@ export default function DocumentIntelligence() {
 
   const fetchDocs = async () => {
     setLoading(true);
-    const data = await base44.entities.DocumentValidationLog.list("-created_date", 500);
+    const data = await api.entities.DocumentValidationLog.list("-created_date", 500);
     setDocs(data.filter(d => !d.is_deleted));
     setLoading(false);
   };
 
   useEffect(() => {
-    base44.auth.me().then(setUser).catch(() => {});
+    api.auth.me().then(setUser).catch(() => {});
     fetchDocs();
   }, []);
 

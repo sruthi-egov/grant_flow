@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -43,24 +43,24 @@ export default function MOUDetail() {
   const [showEdit, setShowEdit] = useState(false);
 
   useEffect(() => {
-    base44.auth.me().then(setUser).catch(() => {});
+    api.auth.me().then(setUser).catch(() => {});
     if (mouId) fetchData();
   }, [mouId]);
 
   const fetchData = async () => {
-    const data = await base44.entities.MOU.filter({ id: mouId });
+    const data = await api.entities.MOU.filter({ id: mouId });
     setMou(data[0] || null);
     setLoading(false);
   };
 
   const handleSave = async (formData) => {
-    await base44.entities.MOU.update(mou.id, formData);
+    await api.entities.MOU.update(mou.id, formData);
     setShowEdit(false);
     fetchData();
   };
 
   const handleArchive = async () => {
-    await base44.entities.MOU.update(mou.id, { archived: true });
+    await api.entities.MOU.update(mou.id, { archived: true });
     window.location.href = createPageUrl("MOUs");
   };
 

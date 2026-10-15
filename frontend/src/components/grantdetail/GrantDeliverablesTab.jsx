@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -28,8 +28,8 @@ function DeliverableModal({ deliverable, grantId, onClose, onSaved }) {
 
   const handleSave = async () => {
     const data = { ...form, grant_id: grantId };
-    if (deliverable?.id) await base44.entities.GrantDeliverable.update(deliverable.id, data);
-    else await base44.entities.GrantDeliverable.create(data);
+    if (deliverable?.id) await api.entities.GrantDeliverable.update(deliverable.id, data);
+    else await api.entities.GrantDeliverable.create(data);
     onSaved();
   };
 
@@ -90,7 +90,7 @@ export default function GrantDeliverablesTab({ grantId, pdfUrl, isAdmin }) {
     setLoading(true);
     setError("");
     try {
-      const data = await base44.entities.GrantDeliverable.filter({ grant_id: grantId }, "due_date");
+      const data = await api.entities.GrantDeliverable.filter({ grant_id: grantId }, "due_date");
       setItems(data || []);
     } catch (e) {
       setError("Unable to load deliverables. Please retry.");
@@ -102,7 +102,7 @@ export default function GrantDeliverablesTab({ grantId, pdfUrl, isAdmin }) {
   useEffect(() => { fetchData(); }, [grantId]);
 
   const handleDelete = async (id) => {
-    await base44.entities.GrantDeliverable.delete(id);
+    await api.entities.GrantDeliverable.delete(id);
     fetchData();
   };
 

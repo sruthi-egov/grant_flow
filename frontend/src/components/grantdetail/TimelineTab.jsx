@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { format, parseISO } from "date-fns";
 import { DollarSign, Calendar, CheckCircle2, AlertCircle, Clock, Package, TrendingUp, FileText } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -98,10 +98,10 @@ export default function TimelineTab({ grantId }) {
 
   useEffect(() => {
     Promise.all([
-      base44.entities.GrantTranche.filter({ grant_id: grantId }),
-      base44.entities.Milestone.filter({ grant_id: grantId }),
-      base44.entities.GrantDeliverable.filter({ grant_id: grantId }),
-      base44.entities.GrantReportingObligation.filter({ grant_id: grantId }),
+      api.entities.GrantTranche.filter({ grant_id: grantId }),
+      api.entities.Milestone.filter({ grant_id: grantId }),
+      api.entities.GrantDeliverable.filter({ grant_id: grantId }),
+      api.entities.GrantReportingObligation.filter({ grant_id: grantId }),
     ]).then(([tranches, milestones, deliverables, obligations]) => {
       const all = [
         ...tranches.map(e => ({ ...e, _type: "tranche" })),

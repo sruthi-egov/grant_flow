@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -51,8 +51,8 @@ function ClauseModal({ clause, msaId, onClose, onSaved }) {
     if (!form.clause_title) return;
     setSaving(true);
     const data = { ...form, msa_id: msaId, extracted_from_pdf: clause?.extracted_from_pdf || false };
-    if (clause?.id) await base44.entities.MsaKeyClause.update(clause.id, data);
-    else await base44.entities.MsaKeyClause.create(data);
+    if (clause?.id) await api.entities.MsaKeyClause.update(clause.id, data);
+    else await api.entities.MsaKeyClause.create(data);
     setSaving(false);
     onSaved();
   };
@@ -178,7 +178,7 @@ function ExtractionReviewModal({ extracted, existingClauses, msaId, onClose, onS
     const toSave = selected.filter(c => c._selected);
     for (const clause of toSave) {
       const { _selected, _isDup, _idx, ...data } = clause;
-      await base44.entities.MsaKeyClause.create({ ...data, msa_id: msaId, extracted_from_pdf: true });
+      await api.entities.MsaKeyClause.create({ ...data, msa_id: msaId, extracted_from_pdf: true });
     }
     setSaving(false);
     onSaved();
@@ -238,14 +238,14 @@ export default function KeyClausesTab({ msaId, isAdmin, msaPdfUrl }) {
   const [progressStatus, setProgressStatus] = useState("idle"); // idle | running | error
 
   const fetchData = async () => {
-    const data = await base44.entities.MsaKeyClause.filter({ msa_id: msaId });
+    const data = await api.entities.MsaKeyClause.filter({ msa_id: msaId });
     setClauses(data);
   };
 
   useEffect(() => { fetchData(); }, [msaId]);
 
   const handleDelete = async (id) => {
-    await base44.entities.MsaKeyClause.delete(id);
+    await api.entities.MsaKeyClause.delete(id);
     fetchData();
   };
 
@@ -264,7 +264,7 @@ export default function KeyClausesTab({ msaId, isAdmin, msaPdfUrl }) {
     const stepTimer2 = setTimeout(() => setProgressStep("extracting"), 4000);
 
     try {
-      const res = await base44.functions.invoke("extractMsaServicesAndKeyClauses", {
+      const res = await api.functions.invoke("extractMsaServicesAndKeyClauses", {
         pdf_url: msaPdfUrl,
         msa_id: msaId,
         extract_type: "key_clauses"

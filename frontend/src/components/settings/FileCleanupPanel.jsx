@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -39,15 +39,15 @@ export default function FileCleanupPanel() {
     setExporting(true);
     try {
       const [grants, sows, msas, mous, uploadLogs, validationLogs, deliverables, milestones, auditLogs] = await Promise.all([
-        base44.entities.Grant.list(),
-        base44.entities.SOW.list(),
-        base44.entities.MSA.list(),
-        base44.entities.MOU.list(),
-        base44.entities.DocumentUploadLog.list(),
-        base44.entities.DocumentValidationLog.list(),
-        base44.entities.GrantDeliverable.list(),
-        base44.entities.Milestone.list(),
-        base44.entities.AuditLog.list(),
+        api.entities.Grant.list(),
+        api.entities.SOW.list(),
+        api.entities.MSA.list(),
+        api.entities.MOU.list(),
+        api.entities.DocumentUploadLog.list(),
+        api.entities.DocumentValidationLog.list(),
+        api.entities.GrantDeliverable.list(),
+        api.entities.Milestone.list(),
+        api.entities.AuditLog.list(),
       ]);
       const backup = { exported_at: new Date().toISOString(), grants, sows, msas, mous, uploadLogs, validationLogs, deliverables, milestones, auditLogs };
       const blob = new Blob([buildBackupData(backup)], { type: "application/json" });
@@ -72,7 +72,7 @@ export default function FileCleanupPanel() {
     setResult(null);
     try {
       setProgress("Deleting document logs and file references...");
-      const res = await base44.functions.invoke("performFileCleanup", {
+      const res = await api.functions.invoke("performFileCleanup", {
         scope,
         backup_exported: backupDone,
       });

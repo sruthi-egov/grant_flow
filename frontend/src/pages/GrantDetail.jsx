@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -33,9 +33,9 @@ export default function GrantDetail() {
   const [user, setUser] = useState(null);
 
   useEffect(() => {
-    base44.auth.me().then(setUser).catch(() => {});
+    api.auth.me().then(setUser).catch(() => {});
     if (grantId) {
-      base44.entities.Grant.filter({ id: grantId }).then(data => {
+      api.entities.Grant.filter({ id: grantId }).then(data => {
         setGrant(data[0] || null);
         setLoading(false);
       });
@@ -43,7 +43,7 @@ export default function GrantDetail() {
   }, [grantId]);
 
   const refetch = async () => {
-    const data = await base44.entities.Grant.filter({ id: grantId });
+    const data = await api.entities.Grant.filter({ id: grantId });
     setGrant(data[0] || null);
   };
 

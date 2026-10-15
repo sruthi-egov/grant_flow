@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Link } from "react-router-dom";
@@ -26,15 +26,15 @@ export default function Next4WeeksReport() {
 
   useEffect(() => {
     Promise.all([
-      base44.entities.Grant.list("-created_date", 500),
-      base44.entities.GrantTranche.list("due_date", 500),
-      base44.entities.GrantDeliverable.list("due_date", 500),
-      base44.entities.SOW.list("-created_date", 500),
-      base44.entities.SowInvoice.list("due_date", 500),
-      base44.entities.SowDeliverable.list("due_date", 500),
-      base44.entities.MSA.list("-created_date", 500),
-      base44.entities.MOU.list("-created_date", 500),
-      base44.entities.MouCommitment.list("due_date", 500),
+      api.entities.Grant.list("-created_date", 500),
+      api.entities.GrantTranche.list("due_date", 500),
+      api.entities.GrantDeliverable.list("due_date", 500),
+      api.entities.SOW.list("-created_date", 500),
+      api.entities.SowInvoice.list("due_date", 500),
+      api.entities.SowDeliverable.list("due_date", 500),
+      api.entities.MSA.list("-created_date", 500),
+      api.entities.MOU.list("-created_date", 500),
+      api.entities.MouCommitment.list("due_date", 500),
     ]).then(([grants,tranches,gd,sows,si,sd,msas,mous,mc]) =>
       setData({ grants,tranches,gd,sows,si,sd,msas,mous,mc,loading:false })
     );

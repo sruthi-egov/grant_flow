@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -42,8 +42,8 @@ function CommitmentModal({ item, mouId, onClose, onSaved }) {
 
   const handleSave = async () => {
     const data = { ...form, mou_id: mouId };
-    if (item?.id) await base44.entities.MouCommitment.update(item.id, data);
-    else await base44.entities.MouCommitment.create(data);
+    if (item?.id) await api.entities.MouCommitment.update(item.id, data);
+    else await api.entities.MouCommitment.create(data);
     onSaved();
   };
 
@@ -105,7 +105,7 @@ export default function CommitmentsTab({ mouId, pdfUrl, isAdmin }) {
   const [showExtract, setShowExtract] = useState(false);
 
   const fetchData = async () => {
-    const data = await base44.entities.MouCommitment.filter({ mou_id: mouId });
+    const data = await api.entities.MouCommitment.filter({ mou_id: mouId });
     setItems(data);
   };
 
@@ -163,7 +163,7 @@ export default function CommitmentsTab({ mouId, pdfUrl, isAdmin }) {
                   {isAdmin && (
                     <div className="flex gap-1 shrink-0">
                       <Button variant="ghost" size="icon" onClick={() => setEditing(c)}><Pencil className="w-3 h-3" /></Button>
-                      <Button variant="ghost" size="icon" onClick={() => base44.entities.MouCommitment.delete(c.id).then(fetchData)}>
+                      <Button variant="ghost" size="icon" onClick={() => api.entities.MouCommitment.delete(c.id).then(fetchData)}>
                         <Trash2 className="w-3 h-3 text-red-500" />
                       </Button>
                     </div>

@@ -3,7 +3,7 @@
  * Handles upload, AI validation, classification, duplicate detection for any module.
  */
 import { useState, useRef } from "react";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { Button } from "@/components/ui/button";
 import { Upload, Loader2, CheckCircle2, XCircle, AlertTriangle } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -77,7 +77,7 @@ export default function UniversalDocumentUploader({
 
     setLoading(true);
     setLoadingMsg("Uploading document...");
-    const { file_url } = await base44.integrations.Core.UploadFile({ file });
+    const { file_url } = await api.integrations.Core.UploadFile({ file });
 
     await runProcess(file, file_url, false);
   };

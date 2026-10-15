@@ -165,8 +165,16 @@ export class AuthService {
     currentPassword: string,
     newPassword: string,
   ): Promise<void> {
-    if (!newPassword || newPassword.length < 10) {
-      throw new BadRequestException('New password must be at least 10 characters');
+    // Mirrors PASSWORD_REGEX in UpdatePasswordModal.jsx so the client-side
+    // rule and the server-side rule cannot disagree.
+    const policy = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).{8,}$/;
+    if (!newPassword || !policy.test(newPassword)) {
+      throw new BadRequestException(
+        'Password must be at least 8 characters and include an uppercase letter, a lowercase letter, a number and a special character.',
+      );
+    }
+    if (newPassword === currentPassword) {
+      throw new BadRequestException('New password must be different from the current password');
     }
 
     const user = await this.prisma.user.findUnique({ where: { id: userId } });

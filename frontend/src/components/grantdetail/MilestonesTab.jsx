@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -31,9 +31,9 @@ function MilestoneModal({ milestone, grantId, onClose, onSaved }) {
   const handleSave = async () => {
     const data = { ...form, grant_id: grantId, amount: parseFloat(form.amount) || 0 };
     if (milestone?.id) {
-      await base44.entities.Milestone.update(milestone.id, data);
+      await api.entities.Milestone.update(milestone.id, data);
     } else {
-      await base44.entities.Milestone.create(data);
+      await api.entities.Milestone.create(data);
     }
     onSaved();
   };
@@ -78,14 +78,14 @@ export default function MilestonesTab({ grantId, pdfUrl, isAdmin }) {
   const [showExtract, setShowExtract] = useState(false);
 
   const fetchMilestones = async () => {
-    const data = await base44.entities.Milestone.filter({ grant_id: grantId }, "due_date");
+    const data = await api.entities.Milestone.filter({ grant_id: grantId }, "due_date");
     setMilestones(data);
   };
 
   useEffect(() => { fetchMilestones(); }, [grantId]);
 
   const handleDelete = async (id) => {
-    await base44.entities.Milestone.delete(id);
+    await api.entities.Milestone.delete(id);
     fetchMilestones();
   };
 

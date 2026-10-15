@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -29,8 +29,8 @@ function MilestoneModal({ milestone, mouId, onClose, onSaved }) {
   const handleSave = async () => {
     // Reuse Milestone entity (grant_id = mouId)
     const data = { ...form, grant_id: mouId, amount: form.amount ? parseFloat(form.amount) : null };
-    if (milestone?.id) await base44.entities.Milestone.update(milestone.id, data);
-    else await base44.entities.Milestone.create(data);
+    if (milestone?.id) await api.entities.Milestone.update(milestone.id, data);
+    else await api.entities.Milestone.create(data);
     onSaved();
   };
 
@@ -88,7 +88,7 @@ export default function MouMilestonesTab({ mouId, pdfUrl, isAdmin }) {
 
   const fetchData = async () => {
     // Reuse Milestone entity (grant_id = mouId)
-    const data = await base44.entities.Milestone.filter({ grant_id: mouId }, "due_date");
+    const data = await api.entities.Milestone.filter({ grant_id: mouId }, "due_date");
     setItems(data);
   };
 
@@ -156,7 +156,7 @@ export default function MouMilestonesTab({ mouId, pdfUrl, isAdmin }) {
                     {isAdmin && (
                       <>
                         <Button variant="ghost" size="icon" onClick={() => setEditing(m)}><Pencil className="w-4 h-4" /></Button>
-                        <Button variant="ghost" size="icon" onClick={() => base44.entities.Milestone.delete(m.id).then(fetchData)}>
+                        <Button variant="ghost" size="icon" onClick={() => api.entities.Milestone.delete(m.id).then(fetchData)}>
                           <Trash2 className="w-4 h-4 text-red-500" />
                         </Button>
                       </>

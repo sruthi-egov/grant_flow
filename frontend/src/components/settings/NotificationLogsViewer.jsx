@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -22,7 +22,7 @@ export default function NotificationLogsViewer() {
 
   const load = async () => {
     setLoading(true);
-    const all = await base44.entities.NotificationLog.list("-created_date", 200);
+    const all = await api.entities.NotificationLog.list("-created_date", 200);
     setLogs(all);
     setLoading(false);
   };

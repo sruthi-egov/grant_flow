@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,7 +17,7 @@ export default function AdditionalRecipientsManager({ settingsId, onSettingsChan
   const [validationError, setValidationError] = useState("");
 
   useEffect(() => {
-    base44.entities.AppSettings.list().then(s => {
+    api.entities.AppSettings.list().then(s => {
       if (s.length > 0) {
         setEmails(s[0].alert_emails || []);
         setLocalSettingsId(s[0].id);
@@ -44,9 +44,9 @@ export default function AdditionalRecipientsManager({ settingsId, onSettingsChan
     setSaving(true);
     try {
       if (localSettingsId) {
-        await base44.entities.AppSettings.update(localSettingsId, { alert_emails: emails });
+        await api.entities.AppSettings.update(localSettingsId, { alert_emails: emails });
       } else {
-        const created = await base44.entities.AppSettings.create({ alert_emails: emails, notifications_enabled: false, days_before: 7 });
+        const created = await api.entities.AppSettings.create({ alert_emails: emails, notifications_enabled: false, days_before: 7 });
         setLocalSettingsId(created.id);
       }
       setSaving(false);

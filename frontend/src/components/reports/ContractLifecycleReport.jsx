@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
@@ -56,10 +56,10 @@ export default function ContractLifecycleReport() {
 
   useEffect(() => {
     Promise.all([
-      base44.entities.SOW.list("-created_date", 500),
-      base44.entities.MSA.list("-created_date", 500),
-      base44.entities.MOU.list("-created_date", 500),
-      base44.entities.Grant.list("-created_date", 500),
+      api.entities.SOW.list("-created_date", 500),
+      api.entities.MSA.list("-created_date", 500),
+      api.entities.MOU.list("-created_date", 500),
+      api.entities.Grant.list("-created_date", 500),
     ]).then(([s,ms,mo,g]) => { setSows(s); setMsas(ms); setMous(mo); setGrants(g); setLoading(false); });
   }, []);
 

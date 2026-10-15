@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,7 +30,7 @@ export default function NotificationTemplatesManager() {
   const [initialized, setInitialized] = useState(false);
 
   useEffect(() => {
-    base44.entities.NotificationTemplate.list().then(dbTemplates => {
+    api.entities.NotificationTemplate.list().then(dbTemplates => {
       if (dbTemplates.length === 0) {
         setTemplates(DEFAULT_TEMPLATES.map(t => ({ ...t, _isNew: true, is_active: true })));
       } else {
@@ -49,12 +49,12 @@ export default function NotificationTemplatesManager() {
     for (const tmpl of templates) {
       const data = { name: tmpl.name, template_type: tmpl.template_type, subject: tmpl.subject, body: tmpl.body, is_active: tmpl.is_active ?? true };
       if (tmpl._isNew || !tmpl.id) {
-        await base44.entities.NotificationTemplate.create(data);
+        await api.entities.NotificationTemplate.create(data);
       } else {
-        await base44.entities.NotificationTemplate.update(tmpl.id, data);
+        await api.entities.NotificationTemplate.update(tmpl.id, data);
       }
     }
-    const dbTemplates = await base44.entities.NotificationTemplate.list();
+    const dbTemplates = await api.entities.NotificationTemplate.list();
     setTemplates(dbTemplates);
     setSaving(false);
     toast.success("Templates saved");

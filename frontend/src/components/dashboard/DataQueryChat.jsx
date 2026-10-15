@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -186,7 +186,7 @@ export default function DataQueryChat(props) {
   const [user, setUser] = useState(null);
 
   useEffect(() => {
-    base44.auth.me().then(setUser).catch(() => {});
+    api.auth.me().then(setUser).catch(() => {});
   }, []);
 
   // Respect module permissions for non-admins
@@ -223,7 +223,7 @@ export default function DataQueryChat(props) {
 
     const context = buildContext(scope, filteredProps);
 
-    const result = await base44.integrations.Core.InvokeLLM({
+    const result = await api.integrations.Core.InvokeLLM({
       prompt: `You are GrantOS, a comprehensive contract and grants management assistant. Answer the user's question concisely and specifically using ONLY the data provided below. Be specific with names, amounts, dates, and statuses. Format dates as "Month Day, Year". If calculating totals, show the breakdown. If the requested data is not in the context, say so clearly.
 
 Today's date: ${today}

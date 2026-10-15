@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { Badge } from "@/components/ui/badge";
 import { format, parseISO, differenceInDays, getMonth, getYear } from "date-fns";
 import { SectionHeader, EmptyRow, Th, Td, KpiChip, TableWithHead } from "./ReportUtils";
@@ -13,10 +13,10 @@ export default function FinancialHealthReport() {
 
   useEffect(() => {
     Promise.all([
-      base44.entities.Grant.list("-created_date", 500),
-      base44.entities.GrantTranche.list("due_date", 500),
-      base44.entities.SOW.list("-created_date", 500),
-      base44.entities.SowInvoice.list("due_date", 500),
+      api.entities.Grant.list("-created_date", 500),
+      api.entities.GrantTranche.list("due_date", 500),
+      api.entities.SOW.list("-created_date", 500),
+      api.entities.SowInvoice.list("due_date", 500),
     ]).then(([g, tr, s, si]) => {
       setGrants(g); setTranches(tr); setSows(s); setSowInvoices(si); setLoading(false);
     });

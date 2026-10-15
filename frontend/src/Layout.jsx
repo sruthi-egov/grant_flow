@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { createPageUrl } from "@/utils";
 import { LayoutDashboard, FileText, Menu, X, Settings, Archive, ClipboardList, ScrollText, Handshake, UserCog, BarChart2, LogOut, ChevronDown, User, BrainCircuit, Shield, KeyRound, FlaskConical, Briefcase, CalendarDays } from "lucide-react";
 import UpdatePasswordModal from "@/components/auth/UpdatePasswordModal";
@@ -43,14 +43,14 @@ export default function Layout({ children, currentPageName }) {
   const [envSettings, setEnvSettings] = useState(null);
 
   useEffect(() => {
-    base44.auth.me().then(setUser).catch(() => {});
-    base44.entities.AppSettings.list().then(s => {
+    api.auth.me().then(setUser).catch(() => {});
+    api.entities.AppSettings.list().then(s => {
       if (s.length > 0) setEnvSettings(s[0]);
     }).catch(() => {});
   }, []);
 
   const handleLogout = () => {
-    base44.auth.logout("/");
+    api.auth.logout("/");
   };
 
   const isAdmin = user?.role === "admin";

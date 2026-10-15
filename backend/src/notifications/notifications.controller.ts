@@ -39,6 +39,20 @@ export class NotificationsController {
     });
   }
 
+  /**
+   * Ad-hoc single email, replacing `integrations.Core.SendEmail`.
+   * Goes through the same mailer as scheduled notifications, so the recipient
+   * domain allow-list and delivery logging apply here too.
+   */
+  @Post('send-email')
+  @HttpCode(200)
+  sendEmail(
+    @Body() body: { to: string; subject: string; body: string; from_name?: string },
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.notifications.sendAdHocEmail(body ?? ({} as any), user.email);
+  }
+
   /** Plain "does SMTP work" check for the Settings page. */
   @Post('test-simple')
   @HttpCode(200)

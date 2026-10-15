@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
@@ -25,13 +25,13 @@ export default function ComplianceReport() {
 
   useEffect(() => {
     Promise.all([
-      base44.entities.Grant.list("-created_date", 500),
-      base44.entities.GrantReportingObligation.list("due_date", 500),
-      base44.entities.MouCommitment.list("due_date", 500),
-      base44.entities.MOU.list("-created_date", 500),
-      base44.entities.SowDeliverable.list("due_date", 500),
-      base44.entities.SOW.list("-created_date", 500),
-      base44.entities.MSA.list("-created_date", 500),
+      api.entities.Grant.list("-created_date", 500),
+      api.entities.GrantReportingObligation.list("due_date", 500),
+      api.entities.MouCommitment.list("due_date", 500),
+      api.entities.MOU.list("-created_date", 500),
+      api.entities.SowDeliverable.list("due_date", 500),
+      api.entities.SOW.list("-created_date", 500),
+      api.entities.MSA.list("-created_date", 500),
     ]).then(([g, ob, mc, mo, sd, s, ms]) => {
       setGrants(g); setObligations(ob); setMouCommitments(mc); setMous(mo);
       setSowDeliverables(sd); setSows(s); setMsas(ms); setLoading(false);
@@ -72,8 +72,8 @@ export default function ComplianceReport() {
   const completedQ = obligations.filter(o=>o.status==="Submitted"&&o.submitted_date&&isAfter(parseISO(o.submitted_date),subDays(today,90))).length;
 
   const markSubmitted = async (id) => {
-    await base44.entities.GrantReportingObligation.update(id, { status: "Submitted", submitted_date: format(today, "yyyy-MM-dd") });
-    const updated = await base44.entities.GrantReportingObligation.list("due_date", 500);
+    await api.entities.GrantReportingObligation.update(id, { status: "Submitted", submitted_date: format(today, "yyyy-MM-dd") });
+    const updated = await api.entities.GrantReportingObligation.list("due_date", 500);
     setObligations(updated);
   };
 

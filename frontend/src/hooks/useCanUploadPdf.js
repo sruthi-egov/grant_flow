@@ -7,7 +7,7 @@
  * Primary export: usePermissions() + canUploadPDF(permissions, moduleName)
  */
 import { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 
 // ─── Module alias map ──────────────────────────────────────────────────────────
 const MODULE_ALIASES = {
@@ -88,7 +88,7 @@ export function usePermissions() {
     let cancelled = false;
     (async () => {
       try {
-        const res = await base44.functions.invoke("getMyPermissions", {});
+        const res = await api.functions.invoke("getMyPermissions", {});
         if (!cancelled && res?.data) {
           setPermissions(res.data);
         }

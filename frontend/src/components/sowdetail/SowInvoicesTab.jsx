@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -27,8 +27,8 @@ function InvoiceModal({ invoice, sowId, onClose, onSaved }) {
 
   const handleSave = async () => {
     const data = { ...form, sow_id: sowId, amount: parseFloat(form.amount) || 0 };
-    if (invoice?.id) await base44.entities.SowInvoice.update(invoice.id, data);
-    else await base44.entities.SowInvoice.create(data);
+    if (invoice?.id) await api.entities.SowInvoice.update(invoice.id, data);
+    else await api.entities.SowInvoice.create(data);
     onSaved();
   };
 
@@ -77,7 +77,7 @@ export default function SowInvoicesTab({ sowId, isAdmin }) {
   const [uploadingFor, setUploadingFor] = useState(null);
 
   const fetchData = async () => {
-    const data = await base44.entities.SowInvoice.filter({ sow_id: sowId }, "-invoice_date");
+    const data = await api.entities.SowInvoice.filter({ sow_id: sowId }, "-invoice_date");
     setInvoices(data);
   };
 
@@ -133,7 +133,7 @@ export default function SowInvoicesTab({ sowId, isAdmin }) {
                         {isAdmin && (
                           <>
                             <Button variant="ghost" size="icon" onClick={() => setEditing(inv)}><Pencil className="w-3 h-3" /></Button>
-                            <Button variant="ghost" size="icon" onClick={() => base44.entities.SowInvoice.delete(inv.id).then(fetchData)}><Trash2 className="w-3 h-3 text-red-500" /></Button>
+                            <Button variant="ghost" size="icon" onClick={() => api.entities.SowInvoice.delete(inv.id).then(fetchData)}><Trash2 className="w-3 h-3 text-red-500" /></Button>
                           </>
                         )}
                       </div>

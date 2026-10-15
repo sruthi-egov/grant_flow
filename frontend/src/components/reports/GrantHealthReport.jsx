@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -20,18 +20,18 @@ export default function GrantHealthReport() {
 
   useEffect(() => {
     const load = async () => {
-      const grants = await base44.entities.Grant.list("-created_date", 200);
+      const grants = await api.entities.Grant.list("-created_date", 200);
       const active = grants.filter(g => !g.archived);
       const weights = await loadWeightConfig();
 
       const results = await Promise.all(
         active.map(async grant => {
           const [milestones, tranches, obligations, uploadLogs, deliverables] = await Promise.all([
-            base44.entities.Milestone.filter({ grant_id: grant.id }),
-            base44.entities.GrantTranche.filter({ grant_id: grant.id }),
-            base44.entities.GrantReportingObligation.filter({ grant_id: grant.id }),
-            base44.entities.DocumentUploadLog.filter({ entity_id: grant.id }),
-            base44.entities.GrantDeliverable.filter({ grant_id: grant.id }),
+            api.entities.Milestone.filter({ grant_id: grant.id }),
+            api.entities.GrantTranche.filter({ grant_id: grant.id }),
+            api.entities.GrantReportingObligation.filter({ grant_id: grant.id }),
+            api.entities.DocumentUploadLog.filter({ entity_id: grant.id }),
+            api.entities.GrantDeliverable.filter({ grant_id: grant.id }),
           ]);
           const score = calculateGrantHealthScore(grant, { milestones, tranches, obligations, uploadLogs, deliverables }, weights);
           return { grant, score };

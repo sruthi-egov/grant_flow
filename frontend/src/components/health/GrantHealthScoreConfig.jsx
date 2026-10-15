@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,7 +26,7 @@ export default function GrantHealthScoreConfigPanel() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    base44.entities.GrantHealthScoreConfig.list().then(records => {
+    api.entities.GrantHealthScoreConfig.list().then(records => {
       setConfigRecords(records);
       if (records.length > 0) {
         const loaded = { ...DEFAULT_WEIGHTS };
@@ -48,7 +48,7 @@ export default function GrantHealthScoreConfigPanel() {
   const save = async () => {
     if (!isValid) { setError("Total weightage must be exactly 100%."); return; }
     setSaving(true);
-    const user = await base44.auth.me().catch(() => null);
+    const user = await api.auth.me().catch(() => null);
     // Upsert each parameter
     for (const key of PARAMS) {
       const existing = configRecords.find(r => r.parameter_key === key);
@@ -60,13 +60,13 @@ export default function GrantHealthScoreConfigPanel() {
         updated_by: user?.email || "",
       };
       if (existing) {
-        await base44.entities.GrantHealthScoreConfig.update(existing.id, payload);
+        await api.entities.GrantHealthScoreConfig.update(existing.id, payload);
       } else {
-        await base44.entities.GrantHealthScoreConfig.create(payload);
+        await api.entities.GrantHealthScoreConfig.create(payload);
       }
     }
     // Refresh records
-    const refreshed = await base44.entities.GrantHealthScoreConfig.list();
+    const refreshed = await api.entities.GrantHealthScoreConfig.list();
     setConfigRecords(refreshed);
     setSaving(false);
     setSaved(true);

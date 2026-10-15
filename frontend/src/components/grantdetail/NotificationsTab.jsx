@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,7 +16,7 @@ export default function NotificationsTab({ grant, onUpdate, isAdmin }) {
 
   const saveDays = async () => {
     setSaving(true);
-    await base44.entities.Grant.update(grant.id, { notification_days_before: parseInt(days) });
+    await api.entities.Grant.update(grant.id, { notification_days_before: parseInt(days) });
     await onUpdate();
     setSaving(false);
   };
@@ -26,7 +26,7 @@ export default function NotificationsTab({ grant, onUpdate, isAdmin }) {
     setSending(true);
 
     for (const contact of contacts.filter(c => c.email)) {
-      await base44.integrations.Core.SendEmail({
+      await api.integrations.Core.SendEmail({
         to: contact.email,
         subject: `Reminder: Upcoming deadlines for ${grant.grant_name}`,
         body: `Dear ${contact.name || "Contact"},\n\nThis is a reminder that there are upcoming deadlines for the grant "${grant.grant_name}" (${grant.grantor || ""}).\n\nYou will receive notifications ${days} days before each milestone payment and reporting deadline.\n\nGrant Details:\n- Total Amount: $${(grant.total_amount || 0).toLocaleString()}\n- Period: ${grant.start_date || "—"} to ${grant.end_date || "—"}\n\nPlease log in to the GrantTrack system to view full details.\n\nBest regards,\nGrantTrack`

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -29,8 +29,8 @@ function TrancheModal({ tranche, grantId, onClose, onSaved }) {
   const handleSave = async () => {
     if (!form.tranche_name?.trim()) return;
     const data = { ...form, grant_id: grantId, amount: parseFloat(form.amount) || 0 };
-    if (tranche?.id) await base44.entities.GrantTranche.update(tranche.id, data);
-    else await base44.entities.GrantTranche.create(data);
+    if (tranche?.id) await api.entities.GrantTranche.update(tranche.id, data);
+    else await api.entities.GrantTranche.create(data);
     onSaved();
   };
 
@@ -77,14 +77,14 @@ export default function TranchesTab({ grantId, grant, isAdmin }) {
   const [showExtract, setShowExtract] = useState(false);
 
   const fetchData = async () => {
-    const data = await base44.entities.GrantTranche.filter({ grant_id: grantId }, "due_date");
+    const data = await api.entities.GrantTranche.filter({ grant_id: grantId }, "due_date");
     setTranches(data);
   };
 
   useEffect(() => { fetchData(); }, [grantId]);
 
   const handleDelete = async (id) => {
-    await base44.entities.GrantTranche.delete(id);
+    await api.entities.GrantTranche.delete(id);
     fetchData();
   };
 

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -24,7 +24,7 @@ function PdfSelectStep({ grantId, grantPdfUrl, onSelect, onClose }) {
         sources.push({ file_url: grantPdfUrl, file_name: "Grant Agreement PDF", source: "grant.pdf_url", uploaded_date: null, validation_status: "Linked" });
       }
       try {
-        const logs = await base44.entities.DocumentUploadLog.filter({ entity_id: grantId, entity_type: "Grant" });
+        const logs = await api.entities.DocumentUploadLog.filter({ entity_id: grantId, entity_type: "Grant" });
         logs.forEach(l => {
           if (l.file_url && !sources.find(s => s.file_url === l.file_url)) {
             sources.push({ file_url: l.file_url, file_name: l.file_name, source: "DocumentUploadLog", uploaded_date: l.created_date, uploaded_by: l.uploaded_by, validation_status: "Uploaded" });
@@ -32,7 +32,7 @@ function PdfSelectStep({ grantId, grantPdfUrl, onSelect, onClose }) {
         });
       } catch {}
       try {
-        const vlogs = await base44.entities.DocumentValidationLog.filter({ linked_entity_id: grantId });
+        const vlogs = await api.entities.DocumentValidationLog.filter({ linked_entity_id: grantId });
         vlogs.forEach(l => {
           if (l.file_url && !l.is_deleted && !sources.find(s => s.file_url === l.file_url)) {
             sources.push({ file_url: l.file_url, file_name: l.file_name, source: "DocumentValidationLog", uploaded_date: l.created_date, uploaded_by: l.uploaded_by, validation_status: l.validation_status || "Unknown", doc_type: l.detected_document_type });
@@ -199,7 +199,7 @@ export default function ContactExtractModal({ grantId, grantPdfUrl, existingCont
     setStep("extracting");
     setError(null);
     try {
-      const res = await base44.functions.invoke("extractGrantContacts", {
+      const res = await api.functions.invoke("extractGrantContacts", {
         pdf_url: pdf.file_url,
         parent_id: grantId,
         existing_contacts: existingContacts
@@ -236,11 +236,11 @@ export default function ContactExtractModal({ grantId, grantPdfUrl, existingCont
     }));
 
     const updatedContacts = [...existingContacts, ...mapped];
-    await base44.entities.Grant.update(grantId, { contacts: updatedContacts });
+    await api.entities.Grant.update(grantId, { contacts: updatedContacts });
 
     // Audit log
     try {
-      await base44.entities.AuditLog.create({
+      await api.entities.AuditLog.create({
         action_type: "contacts_saved_from_pdf",
         entity_type: "Grant",
         entity_id: grantId,

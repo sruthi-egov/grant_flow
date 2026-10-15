@@ -7,7 +7,7 @@
  * - Classifies DPI relevance AND checks for invalid "DPI Centre" mentions
  * - Logs the upload to DocumentUploadLog
  */
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 
 const GRANT_KEYWORDS = [
   "grant", "grants", "grant agreement", "grant proposal", "funding", "donor",
@@ -31,7 +31,7 @@ const DPI_KEYWORDS = [
 export async function validatePdfContent(fileUrl) {
   console.log("[PDF Validation] Starting content validation for:", fileUrl);
   try {
-    const result = await base44.integrations.Core.InvokeLLM({
+    const result = await api.integrations.Core.InvokeLLM({
       prompt: `Extract ALL the plain text content from this PDF document. Return the full text exactly as it appears, preserving all words and phrases. Do not summarise or interpret — just extract the raw text content.`,
       file_urls: [fileUrl],
       response_json_schema: {
@@ -86,7 +86,7 @@ export async function computeFileHash(file) {
  */
 export async function checkDuplicate(hash) {
   try {
-    const logs = await base44.entities.DocumentUploadLog.filter({ file_hash: hash });
+    const logs = await api.entities.DocumentUploadLog.filter({ file_hash: hash });
     return logs.length > 0 ? logs[0] : null;
   } catch {
     return null;
@@ -101,7 +101,7 @@ export async function checkDuplicate(hash) {
  */
 export async function classifyDocument(fileUrl) {
   try {
-    const result = await base44.integrations.Core.InvokeLLM({
+    const result = await api.integrations.Core.InvokeLLM({
       prompt: `You are a document classifier for an organisation called DPI (Development Policy Institute).
 
 Analyse this uploaded document and answer two questions:
@@ -171,7 +171,7 @@ export function getRejectionLabel(reason) {
  */
 export async function logDocumentUpload({ fileName, fileUrl, fileHash, entityType, entityId, entityName, uploadedBy, isDpiRelevant, dpiReason, isDuplicate, isInvalid, invalidReason }) {
   try {
-    await base44.entities.DocumentUploadLog.create({
+    await api.entities.DocumentUploadLog.create({
       file_name: fileName,
       file_url: fileUrl,
       file_hash: fileHash,
@@ -198,7 +198,7 @@ export async function logDocumentUpload({ fileName, fileUrl, fileHash, entityTyp
 export async function logRejectedUpload({ fileName, fileUrl, fileHash, entityType, uploadedBy, rejectionReason }) {
   console.log("[logRejectedUpload] Saving rejected document:", fileName, "| Reason:", rejectionReason);
   try {
-    await base44.entities.DocumentUploadLog.create({
+    await api.entities.DocumentUploadLog.create({
       file_name: fileName,
       file_url: fileUrl,
       file_hash: fileHash || "",

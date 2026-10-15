@@ -1,10 +1,10 @@
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import GrantForm from "./GrantForm";
 
 export default function EditGrantModal({ grant, onClose, onSaved }) {
   const handleSave = async (data) => {
-    await base44.entities.Grant.update(grant.id, data);
+    await api.entities.Grant.update(grant.id, data);
     onSaved();
   };
 

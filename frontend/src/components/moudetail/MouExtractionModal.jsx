@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -83,7 +83,7 @@ export default function MouExtractionModal({ open, onClose, mouId, pdfUrl, pdfNa
     const t = startProgressCycle();
 
     try {
-      const res = await base44.functions.invoke("extractMouAll", {
+      const res = await api.functions.invoke("extractMouAll", {
         pdf_url: pdfUrl,
         mou_id: mouId,
         extract_type: extractType,
@@ -152,7 +152,7 @@ export default function MouExtractionModal({ open, onClose, mouId, pdfUrl, pdfNa
     // Save commitments
     for (const c of commitments.filter(x => selCommitments[x._key] && x.title?.trim())) {
       try {
-        await base44.entities.MouCommitment.create({
+        await api.entities.MouCommitment.create({
           mou_id: mouId,
           name: c.title,
           description: c.description || "",
@@ -174,7 +174,7 @@ export default function MouExtractionModal({ open, onClose, mouId, pdfUrl, pdfNa
     // Save deliverables (reuse GrantDeliverable with grant_id = mouId)
     for (const d of deliverables.filter(x => selDeliverables[x._key] && x.title?.trim())) {
       try {
-        await base44.entities.GrantDeliverable.create({
+        await api.entities.GrantDeliverable.create({
           grant_id: mouId,
           name: d.title,
           description: d.description || "",
@@ -193,7 +193,7 @@ export default function MouExtractionModal({ open, onClose, mouId, pdfUrl, pdfNa
     // Save milestones (reuse Milestone with grant_id = mouId)
     for (const m of milestones.filter(x => selMilestones[x._key] && x.title?.trim())) {
       try {
-        await base44.entities.Milestone.create({
+        await api.entities.Milestone.create({
           grant_id: mouId,
           title: m.title,
           description: m.description || "",
@@ -214,7 +214,7 @@ export default function MouExtractionModal({ open, onClose, mouId, pdfUrl, pdfNa
     const selectedContacts = contacts.filter(x => selContacts[x._key] && x.name?.trim());
     if (selectedContacts.length > 0) {
       try {
-        const mouRecord = await base44.entities.MOU.get(mouId);
+        const mouRecord = await api.entities.MOU.get(mouId);
         const existing = mouRecord?.contacts || [];
         const newContacts = selectedContacts.map(ct => ({
           name: ct.name,
@@ -224,7 +224,7 @@ export default function MouExtractionModal({ open, onClose, mouId, pdfUrl, pdfNa
           phone: ct.phone || "",
           extracted_from_pdf: true,
         }));
-        await base44.entities.MOU.update(mouId, { contacts: [...existing, ...newContacts] });
+        await api.entities.MOU.update(mouId, { contacts: [...existing, ...newContacts] });
         savedCount += selectedContacts.length;
       } catch (e) { errors.push(`Contacts: ${e.message}`); }
     }
@@ -232,7 +232,7 @@ export default function MouExtractionModal({ open, onClose, mouId, pdfUrl, pdfNa
     // Save key clauses (reuse MsaKeyClause with msa_id = mouId as proxy)
     for (const kc of clauses.filter(x => selClauses[x._key] && x.clause_title?.trim())) {
       try {
-        await base44.entities.MsaKeyClause.create({
+        await api.entities.MsaKeyClause.create({
           msa_id: mouId,
           clause_title: kc.clause_title,
           clause_number: kc.clause_number || "",

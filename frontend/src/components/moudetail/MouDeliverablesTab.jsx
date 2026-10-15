@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -28,8 +28,8 @@ function Modal({ item, mouId, onClose, onSaved }) {
   const handleSave = async () => {
     // reuse GrantDeliverable entity but linked via grant_id = mouId with a note
     const data = { ...form, grant_id: mouId };
-    if (item?.id) await base44.entities.GrantDeliverable.update(item.id, data);
-    else await base44.entities.GrantDeliverable.create(data);
+    if (item?.id) await api.entities.GrantDeliverable.update(item.id, data);
+    else await api.entities.GrantDeliverable.create(data);
     onSaved();
   };
 
@@ -83,7 +83,7 @@ export default function MouDeliverablesTab({ mouId, pdfUrl, isAdmin }) {
 
   const fetchData = async () => {
     // GrantDeliverable is reused for MOU deliverables (grant_id = mouId)
-    const data = await base44.entities.GrantDeliverable.filter({ grant_id: mouId }, "due_date");
+    const data = await api.entities.GrantDeliverable.filter({ grant_id: mouId }, "due_date");
     setItems(data);
   };
 
@@ -142,7 +142,7 @@ export default function MouDeliverablesTab({ mouId, pdfUrl, isAdmin }) {
                     {isAdmin && (
                       <div className="flex gap-1">
                         <Button variant="ghost" size="icon" onClick={() => setEditing(d)}><Pencil className="w-3 h-3" /></Button>
-                        <Button variant="ghost" size="icon" onClick={() => base44.entities.GrantDeliverable.delete(d.id).then(fetchData)}>
+                        <Button variant="ghost" size="icon" onClick={() => api.entities.GrantDeliverable.delete(d.id).then(fetchData)}>
                           <Trash2 className="w-3 h-3 text-red-500" />
                         </Button>
                       </div>

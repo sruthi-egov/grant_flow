@@ -4,7 +4,7 @@ import NotificationRulesManager from "@/components/settings/NotificationRulesMan
 import NotificationTemplatesManager from "@/components/settings/NotificationTemplatesManager";
 import NotificationLogsViewer from "@/components/settings/NotificationLogsViewer";
 import TestEmailDialog from "@/components/settings/TestEmailDialog";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
@@ -33,8 +33,8 @@ export default function Settings() {
   const [pendingToggleValue, setPendingToggleValue] = useState(false);
 
   useEffect(() => {
-    base44.auth.me().then(setUser).catch(() => {});
-    base44.entities.AppSettings.list().then(s => {
+    api.auth.me().then(setUser).catch(() => {});
+    api.entities.AppSettings.list().then(s => {
       if (s.length > 0) {
         setSettings({ notifications_enabled: s[0].notifications_enabled ?? false, days_before: s[0].days_before ?? 7 });
         setSettingsId(s[0].id);
@@ -48,9 +48,9 @@ export default function Settings() {
     setSaving(true);
     try {
       if (settingsId) {
-        await base44.entities.AppSettings.update(settingsId, settings);
+        await api.entities.AppSettings.update(settingsId, settings);
       } else {
-        const created = await base44.entities.AppSettings.create(settings);
+        const created = await api.entities.AppSettings.create(settings);
         setSettingsId(created.id);
       }
       setSaving(false);

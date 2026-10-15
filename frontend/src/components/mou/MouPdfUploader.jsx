@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { Upload, Loader2, FileText, CheckCircle2 } from "lucide-react";
 import { computeFileHash, checkDuplicate, logDocumentUpload, logRejectedUpload } from "@/hooks/usePdfUpload";
 import DuplicateUploadDialog from "@/components/shared/DuplicateUploadDialog";
@@ -49,8 +49,8 @@ export default function MouPdfUploader({ onExtracted }) {
       // Stage 1: upload + auth + hash in parallel
       setStage("uploading");
       const [{ file_url }, user, hash] = await Promise.all([
-        base44.integrations.Core.UploadFile({ file }),
-        base44.auth.me().catch(() => null),
+        api.integrations.Core.UploadFile({ file }),
+        api.auth.me().catch(() => null),
         computeFileHash(file),
       ]);
 
@@ -81,7 +81,7 @@ export default function MouPdfUploader({ onExtracted }) {
           dpiReason: extraction.dpi_centre_reference?.role || "",
           isDuplicate, isInvalid: false, invalidReason: "",
         }),
-        base44.entities.DocumentValidationLog.create({
+        api.entities.DocumentValidationLog.create({
           file_name: file.name,
           file_url,
           file_hash: hash,
@@ -200,7 +200,7 @@ export default function MouPdfUploader({ onExtracted }) {
 }
 
 async function extractMouData(fileUrl) {
-  const raw = await base44.integrations.Core.InvokeLLM({
+  const raw = await api.integrations.Core.InvokeLLM({
     model: "claude_sonnet_4_6",
     prompt: `You are an expert legal document analyser specialising in Memoranda of Understanding (MoUs).
 

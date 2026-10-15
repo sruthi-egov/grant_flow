@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -48,7 +48,7 @@ export default function ContactsTab({ grant, onUpdate, isAdmin }) {
   const contacts = grant.contacts || [];
 
   const save = async (updated) => {
-    await base44.entities.Grant.update(grant.id, { contacts: updated });
+    await api.entities.Grant.update(grant.id, { contacts: updated });
     onUpdate();
     setEditing(null);
   };

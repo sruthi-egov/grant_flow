@@ -64,6 +64,8 @@ export function buildOrderBy(
 export function buildWhere(
   filter: Record<string, unknown> | undefined,
   allowed: Set<string>,
+  /** Translates mapped enum display values to Prisma member names. */
+  mapEnum: (field: string, value: unknown) => unknown = (_f, v) => v,
 ): Record<string, unknown> {
   if (!filter || typeof filter !== 'object') return {};
 
@@ -74,6 +76,9 @@ export function buildWhere(
       throw new BadRequestException(`Cannot filter by unknown field "${field}"`);
     }
 
+    const convert = (value: unknown): unknown =>
+      Array.isArray(value) ? value.map((v) => mapEnum(field, v)) : mapEnum(field, value);
+
     if (raw !== null && typeof raw === 'object' && !Array.isArray(raw)) {
       const conditions: Record<string, unknown> = {};
       for (const [op, value] of Object.entries(raw as Record<string, unknown>)) {
@@ -81,14 +86,14 @@ export function buildWhere(
         if (!prismaOp) {
           throw new BadRequestException(`Unsupported filter operator "${op}"`);
         }
-        conditions[prismaOp] = value;
+        conditions[prismaOp] = convert(value);
       }
       where[field] = conditions;
       continue;
     }
 
     // Base44 treated an array value as an implicit $in.
-    where[field] = Array.isArray(raw) ? { in: raw } : raw;
+    where[field] = Array.isArray(raw) ? { in: convert(raw) } : convert(raw);
   }
 
   return where;

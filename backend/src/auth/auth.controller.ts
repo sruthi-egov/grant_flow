@@ -29,7 +29,7 @@ class ChangePasswordDto {
   current_password!: string;
 
   @IsString()
-  @MinLength(10, { message: 'New password must be at least 10 characters' })
+  @MinLength(8, { message: 'New password must be at least 8 characters' })
   new_password!: string;
 }
 
@@ -50,9 +50,16 @@ export class AuthController {
   private setSessionCookie(res: Response, accessToken: string): void {
     res.cookie(FILE_SESSION_COOKIE, accessToken, {
       httpOnly: true,
+      // Lax means a cross-site POST never carries this cookie, while a
+      // top-level navigation (clicking a document link) does.
       sameSite: 'lax',
       secure: this.config.get<boolean>('isProduction') ?? false,
-      path: '/api/files',
+      // Scoped to /api rather than /api/files: the cookie is issued from
+      // /api/auth/login, and several HTTP clients refuse a Set-Cookie whose
+      // Path is not a prefix of the request path. Only FileSessionGuard ever
+      // reads it — every other route authenticates from the Bearer header —
+      // so the wider path grants no extra access.
+      path: '/api',
       maxAge: 24 * 60 * 60 * 1000,
     });
   }
@@ -94,7 +101,7 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response,
   ) {
     await this.auth.logout(body?.refresh_token);
-    res.clearCookie(FILE_SESSION_COOKIE, { path: '/api/files' });
+    res.clearCookie(FILE_SESSION_COOKIE, { path: '/api' });
   }
 
   @UseGuards(JwtAuthGuard)

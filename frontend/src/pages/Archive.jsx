@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -41,17 +41,17 @@ export default function Archive() {
 
   const fetchAll = async () => {
     const [g, s, m, mo] = await Promise.all([
-      base44.entities.Grant.filter({ archived: true }, "-updated_date", 100),
-      base44.entities.SOW.filter({ archived: true }, "-updated_date", 100),
-      base44.entities.MSA.filter({ archived: true }, "-updated_date", 100),
-      base44.entities.MOU.filter({ archived: true }, "-updated_date", 100),
+      api.entities.Grant.filter({ archived: true }, "-updated_date", 100),
+      api.entities.SOW.filter({ archived: true }, "-updated_date", 100),
+      api.entities.MSA.filter({ archived: true }, "-updated_date", 100),
+      api.entities.MOU.filter({ archived: true }, "-updated_date", 100),
     ]);
     setGrants(g); setSows(s); setMsas(m); setMous(mo);
     setLoading(false);
   };
 
   const restore = async (entity, id, setter) => {
-    await base44.entities[entity].update(id, { archived: false });
+    await api.entities[entity].update(id, { archived: false });
     setter(prev => prev.filter(x => x.id !== id));
   };
 

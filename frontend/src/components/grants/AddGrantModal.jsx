@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -19,7 +19,7 @@ export default function AddGrantModal({ onClose, onSaved }) {
   };
 
   const handleSave = async (formData) => {
-    await base44.entities.Grant.create({
+    await api.entities.Grant.create({
       ...formData,
       pdf_url: pdfUrl || formData.pdf_url || "",
     });

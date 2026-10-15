@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -28,9 +28,9 @@ function ReportModal({ deadline, grantId, onClose, onSaved }) {
   const handleSave = async () => {
     const data = { ...form, grant_id: grantId };
     if (deadline?.id) {
-      await base44.entities.ReportingDeadline.update(deadline.id, data);
+      await api.entities.ReportingDeadline.update(deadline.id, data);
     } else {
-      await base44.entities.ReportingDeadline.create(data);
+      await api.entities.ReportingDeadline.create(data);
     }
     onSaved();
   };
@@ -71,14 +71,14 @@ export default function ReportingTab({ grantId, isAdmin }) {
   const [uploadingFor, setUploadingFor] = useState(null);
 
   const fetch = async () => {
-    const data = await base44.entities.ReportingDeadline.filter({ grant_id: grantId }, "due_date");
+    const data = await api.entities.ReportingDeadline.filter({ grant_id: grantId }, "due_date");
     setDeadlines(data);
   };
 
   useEffect(() => { fetch(); }, [grantId]);
 
   const handleDelete = async (id) => {
-    await base44.entities.ReportingDeadline.delete(id);
+    await api.entities.ReportingDeadline.delete(id);
     fetch();
   };
 

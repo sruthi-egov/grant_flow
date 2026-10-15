@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -41,13 +41,13 @@ export default function AuditTrail() {
 
   const fetchLogs = async () => {
     setLoading(true);
-    const data = await base44.entities.AuditLog.list("-created_date", 500);
+    const data = await api.entities.AuditLog.list("-created_date", 500);
     setLogs(data);
     setLoading(false);
   };
 
   useEffect(() => {
-    base44.auth.me().then(u => {
+    api.auth.me().then(u => {
       setUser(u);
       if (u?.role === "admin") fetchLogs();
       else setLoading(false);

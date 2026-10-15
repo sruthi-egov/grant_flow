@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,7 +15,7 @@ export default function RejectedDocumentsViewer() {
   const [deleting, setDeleting] = useState(null);
 
   useEffect(() => {
-    base44.entities.DocumentUploadLog.filter({ is_rejected: true })
+    api.entities.DocumentUploadLog.filter({ is_rejected: true })
       .then(data => {
         const sorted = [...data].sort((a, b) => new Date(b.created_date) - new Date(a.created_date));
         setDocs(sorted);
@@ -27,7 +27,7 @@ export default function RejectedDocumentsViewer() {
   const handleDelete = async (id) => {
     if (!window.confirm("Delete this document entry? This cannot be undone.")) return;
     setDeleting(id);
-    await base44.entities.DocumentUploadLog.delete(id);
+    await api.entities.DocumentUploadLog.delete(id);
     setDocs(prev => prev.filter(d => d.id !== id));
     setDeleting(null);
   };

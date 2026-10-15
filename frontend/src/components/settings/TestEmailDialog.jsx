@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -50,7 +50,7 @@ export default function TestEmailDialog({ open, onClose, user }) {
     setRecordSearch("");
     setLoadingRecords(true);
     const entityMap = { Grant: "Grant", SOW: "SOW", MSA: "MSA", MOU: "MOU" };
-    base44.entities[entityMap[recordType]].list().then(recs => {
+    api.entities[entityMap[recordType]].list().then(recs => {
       setRecords(recs.filter(r => !r.archived));
       setLoadingRecords(false);
     }).catch(() => setLoadingRecords(false));
@@ -73,7 +73,7 @@ export default function TestEmailDialog({ open, onClose, user }) {
     setLoading(true);
     setShowConfirm(false);
     try {
-      const res = await base44.functions.invoke("sendTestNotification", {
+      const res = await api.functions.invoke("sendTestNotification", {
         record_type: recordType,
         record_id: recordId,
         event_type: eventType,

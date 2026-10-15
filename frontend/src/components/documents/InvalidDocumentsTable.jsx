@@ -3,7 +3,7 @@
  * Review, Reclassify, Force Approve, Delete
  */
 import { useState } from "react";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -33,13 +33,13 @@ export default function InvalidDocumentsTable({ docs, onRefresh }) {
   const [forceReason, setForceReason] = useState("");
   const [saving, setSaving] = useState(false);
 
-  const user = async () => base44.auth.me().catch(() => null);
+  const user = async () => api.auth.me().catch(() => null);
 
   const handleForceApprove = async () => {
     if (!forceApproveDoc) return;
     setSaving(true);
     const u = await user();
-    await base44.entities.DocumentValidationLog.update(forceApproveDoc.id, {
+    await api.entities.DocumentValidationLog.update(forceApproveDoc.id, {
       validation_status: "ForceApproved",
       review_action: "force_approved",
       force_approved_reason: forceReason,
@@ -63,7 +63,7 @@ export default function InvalidDocumentsTable({ docs, onRefresh }) {
     if (!reclassifyDoc || !newModule) return;
     setSaving(true);
     const u = await user();
-    await base44.entities.DocumentValidationLog.update(reclassifyDoc.id, {
+    await api.entities.DocumentValidationLog.update(reclassifyDoc.id, {
       selected_module: newModule,
       validation_status: "PendingReview",
       review_action: "reclassified",
@@ -88,7 +88,7 @@ export default function InvalidDocumentsTable({ docs, onRefresh }) {
 
   const handleDelete = async (doc) => {
     if (!confirm(`Delete document "${doc.file_name}"? This cannot be undone.`)) return;
-    await base44.entities.DocumentValidationLog.delete(doc.id);
+    await api.entities.DocumentValidationLog.delete(doc.id);
     await logAudit({
       action_type: "document_deleted",
       entity_type: doc.selected_module,

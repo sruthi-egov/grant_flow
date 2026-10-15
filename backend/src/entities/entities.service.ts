@@ -20,7 +20,13 @@ import {
   decimalFieldsOf,
   scalarFieldsOf,
 } from './query-translator';
-import { coerceInput, serializeMany, serializeRecord, stripProtected } from './serializer';
+import {
+  coerceInput,
+  serializeMany,
+  serializeRecord,
+  stripProtected,
+  toPrismaEnumValue,
+} from './serializer';
 
 type Operation = 'create' | 'read' | 'update' | 'delete';
 
@@ -98,9 +104,11 @@ export class EntitiesService {
   }
 
   private serializeOptions(def: EntityDefinition) {
+    const modelName = modelNameOf(def.delegate);
     return {
       dateOnly: def.dateOnly,
-      decimalFields: decimalFieldsOf(modelNameOf(def.delegate)),
+      decimalFields: decimalFieldsOf(modelName),
+      modelName,
     };
   }
 
@@ -131,9 +139,12 @@ export class EntitiesService {
     const def = this.definition(entity);
     this.authorize(entity, def, 'read', user);
 
-    const fields = scalarFieldsOf(modelNameOf(def.delegate));
+    const model = modelNameOf(def.delegate);
+    const fields = scalarFieldsOf(model);
     const rows = await this.delegate(def).findMany({
-      where: buildWhere(body.where, fields),
+      where: buildWhere(body.where, fields, (field, value) =>
+        toPrismaEnumValue(model, field, value),
+      ),
       orderBy: buildOrderBy(body.sort, fields) ?? { created_date: 'desc' },
       take: clampLimit(body.limit),
     });

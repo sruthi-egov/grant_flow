@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -21,14 +21,14 @@ export default function SOWs() {
   const [user, setUser] = useState(null);
 
   useEffect(() => {
-    base44.auth.me().then(setUser).catch(() => {});
+    api.auth.me().then(setUser).catch(() => {});
     fetchData();
   }, []);
 
   const fetchData = async () => {
     const [s, g] = await Promise.all([
-      base44.entities.SOW.list("-created_date", 200),
-      base44.entities.Grant.list("-created_date", 100),
+      api.entities.SOW.list("-created_date", 200),
+      api.entities.Grant.list("-created_date", 100),
     ]);
     setSows(s);
     setGrants(g);

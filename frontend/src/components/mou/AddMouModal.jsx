@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
@@ -23,7 +23,7 @@ export default function AddMouModal({ onClose, onSaved }) {
 
   const handleSave = async (formData) => {
     setSaving(true);
-    await base44.entities.MOU.create({ ...formData, pdf_url: pdfUrl || formData.pdf_url });
+    await api.entities.MOU.create({ ...formData, pdf_url: pdfUrl || formData.pdf_url });
     setSaving(false);
     onSaved();
   };

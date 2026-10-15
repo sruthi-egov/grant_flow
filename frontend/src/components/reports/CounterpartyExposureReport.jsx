@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { Badge } from "@/components/ui/badge";
 import { format, parseISO } from "date-fns";
 import { SectionHeader, EmptyRow, Th, Td, KpiChip, TableWithHead } from "./ReportUtils";
@@ -20,10 +20,10 @@ export default function CounterpartyExposureReport() {
 
   useEffect(() => {
     Promise.all([
-      base44.entities.Grant.list("-created_date", 500),
-      base44.entities.SOW.list("-created_date", 500),
-      base44.entities.MSA.list("-created_date", 500),
-      base44.entities.MOU.list("-created_date", 500),
+      api.entities.Grant.list("-created_date", 500),
+      api.entities.SOW.list("-created_date", 500),
+      api.entities.MSA.list("-created_date", 500),
+      api.entities.MOU.list("-created_date", 500),
     ]).then(([g,s,ms,mo]) => { setGrants(g); setSows(s); setMsas(ms); setMous(mo); setLoading(false); });
   }, []);
 

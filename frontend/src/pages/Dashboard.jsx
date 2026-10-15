@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { addMonths, startOfMonth, endOfMonth, isWithinInterval } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -20,21 +20,21 @@ export default function Dashboard() {
 
   useEffect(() => {
     Promise.all([
-      base44.entities.Grant.list("-created_date", 200),
-      base44.entities.Milestone.list("due_date", 200),
-      base44.entities.ReportingDeadline.list("due_date", 200),
-      base44.entities.SOW.list("-created_date", 200),
-      base44.entities.MSA.list("-created_date", 200),
-      base44.entities.MOU.list("-created_date", 200),
-      base44.entities.GrantTranche.list("due_date", 500),
-      base44.entities.GrantDeliverable.list("due_date", 500),
-      base44.entities.SowDeliverable.list("due_date", 500),
-      base44.entities.MouCommitment.list("due_date", 500),
-      base44.entities.GrantReportingObligation.list("due_date", 200),
-      base44.entities.DocumentUploadLog.list("-created_date", 500),
+      api.entities.Grant.list("-created_date", 200),
+      api.entities.Milestone.list("due_date", 200),
+      api.entities.ReportingDeadline.list("due_date", 200),
+      api.entities.SOW.list("-created_date", 200),
+      api.entities.MSA.list("-created_date", 200),
+      api.entities.MOU.list("-created_date", 200),
+      api.entities.GrantTranche.list("due_date", 500),
+      api.entities.GrantDeliverable.list("due_date", 500),
+      api.entities.SowDeliverable.list("due_date", 500),
+      api.entities.MouCommitment.list("due_date", 500),
+      api.entities.GrantReportingObligation.list("due_date", 200),
+      api.entities.DocumentUploadLog.list("-created_date", 500),
       // Extra entities for chatbot
-      base44.entities.SowMilestone.list("due_date", 500).catch(() => []),
-      base44.entities.MsaKeyClause.list("-created_date", 500).catch(() => []),
+      api.entities.SowMilestone.list("due_date", 500).catch(() => []),
+      api.entities.MsaKeyClause.list("-created_date", 500).catch(() => []),
     ]).then(([grants, milestones, deadlines, sows, msas, mous, tranches,
       grantDeliverables, sowDeliverables, mouCommitments, obligations, uploadLogs,
       sowMilestones, msaKeyClauses]) => {

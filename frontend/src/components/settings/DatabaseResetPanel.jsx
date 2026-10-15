@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,22 +31,22 @@ export default function DatabaseResetPanel() {
         reportingObligations, tranches, sowInvoices, mouCommitments,
         uploadLogs, validationLogs, auditLogs, notifLogs
       ] = await Promise.all([
-        base44.entities.Grant.list(),
-        base44.entities.SOW.list(),
-        base44.entities.MSA.list(),
-        base44.entities.MOU.list(),
-        base44.entities.GrantDeliverable.list(),
-        base44.entities.Milestone.list(),
-        base44.entities.SowDeliverable.list(),
-        base44.entities.SowMilestone.list(),
-        base44.entities.GrantReportingObligation.list(),
-        base44.entities.GrantTranche.list(),
-        base44.entities.SowInvoice.list(),
-        base44.entities.MouCommitment.list(),
-        base44.entities.DocumentUploadLog.list(),
-        base44.entities.DocumentValidationLog.list(),
-        base44.entities.AuditLog.list(),
-        base44.entities.NotificationLog.list(),
+        api.entities.Grant.list(),
+        api.entities.SOW.list(),
+        api.entities.MSA.list(),
+        api.entities.MOU.list(),
+        api.entities.GrantDeliverable.list(),
+        api.entities.Milestone.list(),
+        api.entities.SowDeliverable.list(),
+        api.entities.SowMilestone.list(),
+        api.entities.GrantReportingObligation.list(),
+        api.entities.GrantTranche.list(),
+        api.entities.SowInvoice.list(),
+        api.entities.MouCommitment.list(),
+        api.entities.DocumentUploadLog.list(),
+        api.entities.DocumentValidationLog.list(),
+        api.entities.AuditLog.list(),
+        api.entities.NotificationLog.list(),
       ]);
 
       const backup = {
@@ -77,7 +77,7 @@ export default function DatabaseResetPanel() {
     setRunning(true);
     setResult(null);
     try {
-      const res = await base44.functions.invoke("performDatabaseReset", {
+      const res = await api.functions.invoke("performDatabaseReset", {
         backup_exported: backupDone,
         delete_audit_logs: deleteAuditLogs,
         delete_notification_logs: deleteNotifLogs,

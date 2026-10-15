@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -41,10 +41,10 @@ export default function UpdatePasswordModal({ user, open, onClose }) {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
 
-  // Detect if user logged in via Google (no password-based account)
-  // Base44 sets provider info — if full_name is from Google and no password ever set,
-  // we show an informational message. We check by attempting and catching.
-  const isGoogleUser = user?.login_provider === "google" || user?.auth_provider === "google";
+  // GrantOS uses email + password accounts only; there is no external identity
+  // provider any more. Retained as a constant so the surrounding markup, which
+  // branches on it, keeps working unchanged.
+  const isGoogleUser = false;
 
   const handleClose = () => {
     setCurrentPassword("");
@@ -73,7 +73,7 @@ export default function UpdatePasswordModal({ user, open, onClose }) {
 
     setLoading(true);
     try {
-      await base44.auth.changePassword({
+      await api.auth.changePassword({
         userId: user.id,
         currentPassword,
         newPassword,

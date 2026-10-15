@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -18,14 +18,14 @@ export default function MSAs() {
   const [user, setUser] = useState(null);
 
   useEffect(() => {
-    base44.auth.me().then(setUser).catch(() => {});
+    api.auth.me().then(setUser).catch(() => {});
     fetchData();
   }, []);
 
   const fetchData = async () => {
     const [m, s] = await Promise.all([
-      base44.entities.MSA.list("-created_date", 100),
-      base44.entities.SOW.list("-created_date", 200),
+      api.entities.MSA.list("-created_date", 100),
+      api.entities.SOW.list("-created_date", 200),
     ]);
     setMsas(m);
     setSows(s);

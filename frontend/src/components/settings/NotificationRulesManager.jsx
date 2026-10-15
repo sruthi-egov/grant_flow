@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,7 +24,7 @@ export default function NotificationRulesManager() {
   const [initialized, setInitialized] = useState(false);
 
   useEffect(() => {
-    base44.entities.NotificationRule.list().then(dbRules => {
+    api.entities.NotificationRule.list().then(dbRules => {
       if (dbRules.length === 0) {
         setRules(DEFAULT_RULES.map(r => ({ ...r, _isNew: true })));
       } else {
@@ -58,13 +58,13 @@ export default function NotificationRulesManager() {
     for (const rule of rules) {
       const data = { name: rule.name, trigger_type: rule.trigger_type, reminder_days_before: rule.reminder_days_before, overdue_frequency_days: rule.overdue_frequency_days, is_enabled: rule.is_enabled, template_type_upcoming: rule.template_type_upcoming, template_type_overdue: rule.template_type_overdue };
       if (rule._isNew || !rule.id) {
-        await base44.entities.NotificationRule.create(data);
+        await api.entities.NotificationRule.create(data);
       } else {
-        await base44.entities.NotificationRule.update(rule.id, data);
+        await api.entities.NotificationRule.update(rule.id, data);
       }
     }
     // Reload from DB
-    const dbRules = await base44.entities.NotificationRule.list();
+    const dbRules = await api.entities.NotificationRule.list();
     setRules(dbRules);
     setSaving(false);
     toast.success("Notification rules saved");

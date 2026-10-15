@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -18,12 +18,12 @@ export default function MOUs() {
   const [user, setUser] = useState(null);
 
   useEffect(() => {
-    base44.auth.me().then(setUser).catch(() => {});
+    api.auth.me().then(setUser).catch(() => {});
     fetchData();
   }, []);
 
   const fetchData = async () => {
-    const data = await base44.entities.MOU.list("-created_date", 100);
+    const data = await api.entities.MOU.list("-created_date", 100);
     setMous(data);
     setLoading(false);
   };

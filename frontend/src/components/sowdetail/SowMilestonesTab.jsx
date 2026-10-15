@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -28,8 +28,8 @@ function MilestoneModal({ milestone, sowId, onClose, onSaved }) {
 
   const handleSave = async () => {
     const data = { ...form, sow_id: sowId, amount: form.amount ? parseFloat(form.amount) : null };
-    if (milestone?.id) await base44.entities.SowMilestone.update(milestone.id, data);
-    else await base44.entities.SowMilestone.create(data);
+    if (milestone?.id) await api.entities.SowMilestone.update(milestone.id, data);
+    else await api.entities.SowMilestone.create(data);
     onSaved();
   };
 
@@ -86,7 +86,7 @@ export default function SowMilestonesTab({ sowId, pdfUrl, isAdmin }) {
   const [showExtract, setShowExtract] = useState(false);
 
   const fetchData = async () => {
-    const data = await base44.entities.SowMilestone.filter({ sow_id: sowId }, "due_date");
+    const data = await api.entities.SowMilestone.filter({ sow_id: sowId }, "due_date");
     setItems(data);
   };
 
@@ -150,7 +150,7 @@ export default function SowMilestonesTab({ sowId, pdfUrl, isAdmin }) {
                     {isAdmin && (
                       <>
                         <Button variant="ghost" size="icon" onClick={() => setEditing(m)}><Pencil className="w-4 h-4" /></Button>
-                        <Button variant="ghost" size="icon" onClick={() => base44.entities.SowMilestone.delete(m.id).then(fetchData)}><Trash2 className="w-4 h-4 text-red-500" /></Button>
+                        <Button variant="ghost" size="icon" onClick={() => api.entities.SowMilestone.delete(m.id).then(fetchData)}><Trash2 className="w-4 h-4 text-red-500" /></Button>
                       </>
                     )}
                   </div>

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -24,8 +24,8 @@ function Modal({ item, sowId, onClose, onSaved }) {
 
   const handleSave = async () => {
     const data = { ...form, sow_id: sowId };
-    if (item?.id) await base44.entities.SowDeliverable.update(item.id, data);
-    else await base44.entities.SowDeliverable.create(data);
+    if (item?.id) await api.entities.SowDeliverable.update(item.id, data);
+    else await api.entities.SowDeliverable.create(data);
     onSaved();
   };
 
@@ -78,7 +78,7 @@ export default function SowDeliverablesTab({ sowId, pdfUrl, isAdmin }) {
   const [showExtract, setShowExtract] = useState(false);
 
   const fetchData = async () => {
-    const data = await base44.entities.SowDeliverable.filter({ sow_id: sowId }, "due_date");
+    const data = await api.entities.SowDeliverable.filter({ sow_id: sowId }, "due_date");
     setItems(data);
   };
 
@@ -130,7 +130,7 @@ export default function SowDeliverablesTab({ sowId, pdfUrl, isAdmin }) {
                       {isAdmin && (
                         <>
                           <Button variant="ghost" size="icon" onClick={() => setEditing(d)}><Pencil className="w-3 h-3" /></Button>
-                          <Button variant="ghost" size="icon" onClick={() => base44.entities.SowDeliverable.delete(d.id).then(fetchData)}><Trash2 className="w-3 h-3 text-red-500" /></Button>
+                          <Button variant="ghost" size="icon" onClick={() => api.entities.SowDeliverable.delete(d.id).then(fetchData)}><Trash2 className="w-3 h-3 text-red-500" /></Button>
                         </>
                       )}
                     </div>

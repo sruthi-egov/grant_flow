@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -103,12 +103,12 @@ function PdfSelector({ grantId, grantPdfUrl, onSelect }) {
       const results = [];
       // From DocumentUploadLog
       try {
-        const logs = await base44.entities.DocumentUploadLog.filter({ entity_type: "Grant", entity_id: grantId });
+        const logs = await api.entities.DocumentUploadLog.filter({ entity_type: "Grant", entity_id: grantId });
         logs.forEach(l => l.file_url && results.push({ url: l.file_url, name: l.file_name || "Uploaded PDF", date: l.created_date, source: "Document Log" }));
       } catch {}
       // From DocumentValidationLog
       try {
-        const vlogs = await base44.entities.DocumentValidationLog.filter({ linked_entity_id: grantId });
+        const vlogs = await api.entities.DocumentValidationLog.filter({ linked_entity_id: grantId });
         vlogs.forEach(l => l.file_url && results.push({ url: l.file_url, name: l.file_name || "Validated PDF", date: l.created_date, source: "Validation Log", status: l.validation_status }));
       } catch {}
       // From grant.pdf_url directly
@@ -163,7 +163,7 @@ export default function TranchePdfExtractModal({ grantId, grantPdfUrl, existingT
     setSelectedPdf(pdf);
     setStep("extracting");
     try {
-      const res = await base44.functions.invoke("extractGrantTranches", {
+      const res = await api.functions.invoke("extractGrantTranches", {
         pdf_url: pdf.url,
         grant_id: grantId,
         existing_tranches: existingTranches,
@@ -202,7 +202,7 @@ export default function TranchePdfExtractModal({ grantId, grantPdfUrl, existingT
     let saved = 0;
     for (const t of toSave) {
       try {
-        await base44.entities.GrantTranche.create({
+        await api.entities.GrantTranche.create({
           grant_id: grantId,
           tranche_name: t.tranche_name || "Extracted Tranche",
           amount: t.amount ? parseFloat(t.amount) : undefined,
@@ -220,7 +220,7 @@ export default function TranchePdfExtractModal({ grantId, grantPdfUrl, existingT
 
     // Audit log (non-critical)
     try {
-      await base44.entities.AuditLog.create({
+      await api.entities.AuditLog.create({
         action_type: "tranche_extraction",
         entity_type: "Grant",
         entity_id: grantId,
