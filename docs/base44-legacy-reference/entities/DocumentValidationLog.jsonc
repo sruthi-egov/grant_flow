@@ -1,0 +1,174 @@
+{
+  "name": "DocumentValidationLog",
+  "type": "object",
+  "properties": {
+    "file_name": {
+      "type": "string"
+    },
+    "file_url": {
+      "type": "string"
+    },
+    "file_hash": {
+      "type": "string"
+    },
+    "selected_module": {
+      "type": "string",
+      "enum": [
+        "Grant",
+        "SOW",
+        "MSA",
+        "MOU",
+        "Milestone",
+        "Deliverable",
+        "Invoice",
+        "ReportingObligation"
+      ]
+    },
+    "linked_entity_id": {
+      "type": "string"
+    },
+    "linked_entity_name": {
+      "type": "string"
+    },
+    "detected_document_type": {
+      "type": "string"
+    },
+    "validation_status": {
+      "type": "string",
+      "enum": [
+        "Valid",
+        "Invalid",
+        "Duplicate",
+        "PendingReview",
+        "NeedsReview",
+        "ForceApproved"
+      ],
+      "default": "PendingReview"
+    },
+    "confidence_score": {
+      "type": "number"
+    },
+    "rejection_reason": {
+      "type": "string"
+    },
+    "extracted_metadata": {
+      "type": "object",
+      "properties": {
+        "document_title": {
+          "type": "string"
+        },
+        "document_type": {
+          "type": "string"
+        },
+        "parties_involved": {
+          "type": "string"
+        },
+        "donor_funder": {
+          "type": "string"
+        },
+        "vendor_service_provider": {
+          "type": "string"
+        },
+        "grant_amount": {
+          "type": "string"
+        },
+        "invoice_amount": {
+          "type": "string"
+        },
+        "start_date": {
+          "type": "string"
+        },
+        "end_date": {
+          "type": "string"
+        },
+        "due_date": {
+          "type": "string"
+        },
+        "reporting_frequency": {
+          "type": "string"
+        },
+        "payment_terms": {
+          "type": "string"
+        },
+        "key_clauses": {
+          "type": "string"
+        },
+        "validation_reason": {
+          "type": "string"
+        }
+      }
+    },
+    "duplicate_of_document_id": {
+      "type": "string"
+    },
+    "uploaded_by": {
+      "type": "string"
+    },
+    "reviewed_by": {
+      "type": "string"
+    },
+    "reviewed_date": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "review_action": {
+      "type": "string",
+      "enum": [
+        "approved",
+        "reclassified",
+        "deleted",
+        "force_approved"
+      ]
+    },
+    "force_approved_reason": {
+      "type": "string"
+    },
+    "reclassified_to": {
+      "type": "string"
+    },
+    "is_deleted": {
+      "type": "boolean",
+      "default": false
+    },
+    "deleted_by": {
+      "type": "string"
+    },
+    "deleted_date": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "deletion_reason": {
+      "type": "string"
+    },
+    "deletion_type": {
+      "type": "string",
+      "enum": [
+        "admin_discard",
+        "duplicate_cleanup",
+        "invalid_file_cleanup",
+        "irrelevant_file_cleanup"
+      ]
+    },
+    "deleted_from_section": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "file_name",
+    "selected_module"
+  ],
+  "rls": {
+    "create": {},
+    "read": {},
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

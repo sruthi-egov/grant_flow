@@ -1,0 +1,99 @@
+{
+  "name": "GrantHealthScoreSnapshot",
+  "type": "object",
+  "properties": {
+    "grant_id": {
+      "type": "string"
+    },
+    "grant_name": {
+      "type": "string"
+    },
+    "milestone_score": {
+      "type": "number"
+    },
+    "financial_score": {
+      "type": "number"
+    },
+    "reporting_score": {
+      "type": "number"
+    },
+    "document_score": {
+      "type": "number"
+    },
+    "timeline_score": {
+      "type": "number"
+    },
+    "milestone_weightage": {
+      "type": "number"
+    },
+    "financial_weightage": {
+      "type": "number"
+    },
+    "reporting_weightage": {
+      "type": "number"
+    },
+    "document_weightage": {
+      "type": "number"
+    },
+    "timeline_weightage": {
+      "type": "number"
+    },
+    "milestone_weighted_score": {
+      "type": "number"
+    },
+    "financial_weighted_score": {
+      "type": "number"
+    },
+    "reporting_weighted_score": {
+      "type": "number"
+    },
+    "document_weighted_score": {
+      "type": "number"
+    },
+    "timeline_weighted_score": {
+      "type": "number"
+    },
+    "overall_score": {
+      "type": "number"
+    },
+    "health_status": {
+      "type": "string",
+      "enum": [
+        "Green",
+        "Amber",
+        "Red"
+      ]
+    },
+    "reasons": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "calculated_date": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "grant_id"
+  ],
+  "rls": {
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "read": {},
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

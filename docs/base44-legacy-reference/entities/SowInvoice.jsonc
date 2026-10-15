@@ -1,0 +1,66 @@
+{
+  "name": "SowInvoice",
+  "type": "object",
+  "properties": {
+    "sow_id": {
+      "type": "string",
+      "description": "Reference to the parent SOW"
+    },
+    "invoice_number": {
+      "type": "string"
+    },
+    "period": {
+      "type": "string",
+      "description": "Billing period, e.g. March 2026"
+    },
+    "amount": {
+      "type": "number"
+    },
+    "invoice_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "due_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "paid_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "draft",
+        "sent",
+        "paid",
+        "overdue"
+      ],
+      "default": "draft"
+    },
+    "notes": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "sow_id"
+  ],
+  "rls": {
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "read": {},
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

@@ -1,0 +1,109 @@
+{
+  "name": "CleanupLog",
+  "type": "object",
+  "properties": {
+    "cleanup_type": {
+      "type": "string",
+      "enum": [
+        "file_cleanup",
+        "full_cleanup"
+      ]
+    },
+    "cleanup_scope": {
+      "type": "string",
+      "enum": [
+        "files_only",
+        "files_and_validation_logs",
+        "files_metadata_and_tables",
+        "files_and_extracted_items",
+        "full_file_cleanup"
+      ]
+    },
+    "initiated_by": {
+      "type": "string"
+    },
+    "initiated_by_email": {
+      "type": "string"
+    },
+    "started_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "completed_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "running",
+        "completed",
+        "failed"
+      ],
+      "default": "running"
+    },
+    "files_deleted_count": {
+      "type": "number",
+      "default": 0
+    },
+    "document_logs_deleted_count": {
+      "type": "number",
+      "default": 0
+    },
+    "validation_logs_deleted_count": {
+      "type": "number",
+      "default": 0
+    },
+    "metadata_cleared_count": {
+      "type": "number",
+      "default": 0
+    },
+    "records_updated_count": {
+      "type": "number",
+      "default": 0
+    },
+    "extracted_items_deleted_count": {
+      "type": "number",
+      "default": 0
+    },
+    "errors": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "backup_exported": {
+      "type": "boolean",
+      "default": false
+    },
+    "summary": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "cleanup_scope",
+    "initiated_by_email"
+  ],
+  "rls": {
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

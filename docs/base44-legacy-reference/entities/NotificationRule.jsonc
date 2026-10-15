@@ -1,0 +1,68 @@
+{
+  "name": "NotificationRule",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string"
+    },
+    "trigger_type": {
+      "type": "string",
+      "enum": [
+        "milestone_due",
+        "deliverable_due",
+        "reporting_due",
+        "payment_due",
+        "contract_expiry",
+        "document_review"
+      ]
+    },
+    "reminder_days_before": {
+      "type": "array",
+      "items": {
+        "type": "number"
+      },
+      "description": "Days before due date to send reminder, e.g. [30, 15, 7, 1, 0]"
+    },
+    "overdue_frequency_days": {
+      "type": "number",
+      "default": 7,
+      "description": "How often (in days) to send overdue reminders. 0 = disabled."
+    },
+    "is_enabled": {
+      "type": "boolean",
+      "default": true
+    },
+    "template_type_upcoming": {
+      "type": "string"
+    },
+    "template_type_overdue": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "name",
+    "trigger_type"
+  ],
+  "rls": {
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

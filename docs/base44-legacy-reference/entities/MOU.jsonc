@@ -1,0 +1,205 @@
+{
+  "name": "MOU",
+  "type": "object",
+  "properties": {
+    "title": {
+      "type": "string"
+    },
+    "partner_name": {
+      "type": "string"
+    },
+    "mou_number": {
+      "type": "string",
+      "description": "MOU reference number"
+    },
+    "partner_type": {
+      "type": "string",
+      "enum": [
+        "government",
+        "ngo",
+        "private",
+        "academic",
+        "multilateral",
+        "other"
+      ]
+    },
+    "partner_address": {
+      "type": "string"
+    },
+    "partner_contact_name": {
+      "type": "string"
+    },
+    "partner_contact_email": {
+      "type": "string"
+    },
+    "partner_signatory_name": {
+      "type": "string"
+    },
+    "partner_signatory_designation": {
+      "type": "string"
+    },
+    "our_contact_name": {
+      "type": "string"
+    },
+    "our_contact_email": {
+      "type": "string"
+    },
+    "our_signatory_name": {
+      "type": "string"
+    },
+    "our_signatory_designation": {
+      "type": "string"
+    },
+    "signed_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Date MOU was signed"
+    },
+    "effective_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "end_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "initial_term_years": {
+      "type": "number"
+    },
+    "review_cycle": {
+      "type": "string",
+      "enum": [
+        "6 months",
+        "annual",
+        "bi-annual",
+        "as needed"
+      ],
+      "description": "How often the MOU is reviewed"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "active",
+        "expired",
+        "draft",
+        "terminated"
+      ],
+      "default": "active"
+    },
+    "purpose": {
+      "type": "string"
+    },
+    "scope_of_collaboration": {
+      "type": "string"
+    },
+    "governing_law": {
+      "type": "string"
+    },
+    "pdf_url": {
+      "type": "string"
+    },
+    "notes": {
+      "type": "string"
+    },
+    "archived": {
+      "type": "boolean",
+      "default": false
+    },
+    "contacts": {
+      "type": "array",
+      "description": "Contacts associated with this MOU \u2014 mandatory notification recipients",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "organization": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string"
+          },
+          "address": {
+            "type": "string"
+          },
+          "contact_type": {
+            "type": "string",
+            "description": "e.g. Partner Contact, Our Contact, Signatory"
+          },
+          "extracted_from_pdf": {
+            "type": "boolean"
+          },
+          "is_active": {
+            "type": "boolean",
+            "default": true,
+            "description": "Only active contacts receive notifications"
+          }
+        }
+      }
+    },
+    "rate_cards": {
+      "type": "array",
+      "description": "Extracted rate card and commercial tables from the MoU PDF",
+      "items": {
+        "type": "object",
+        "properties": {
+          "table_title": {
+            "type": "string"
+          },
+          "table_type": {
+            "type": "string"
+          },
+          "columns": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "currency": {
+            "type": "string"
+          },
+          "billing_frequency": {
+            "type": "string"
+          },
+          "extraction_confidence": {
+            "type": "number"
+          },
+          "notes": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "required": [
+    "title",
+    "partner_name"
+  ],
+  "rls": {
+    "create": {},
+    "read": {},
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

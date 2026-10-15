@@ -1,0 +1,63 @@
+{
+  "name": "NotificationTemplate",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string"
+    },
+    "template_type": {
+      "type": "string",
+      "enum": [
+        "milestone_upcoming",
+        "milestone_overdue",
+        "deliverable_upcoming",
+        "deliverable_overdue",
+        "reporting_upcoming",
+        "reporting_overdue",
+        "payment_upcoming",
+        "payment_overdue",
+        "contract_expiry",
+        "document_review",
+        "test_email"
+      ]
+    },
+    "subject": {
+      "type": "string"
+    },
+    "body": {
+      "type": "string"
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true
+    }
+  },
+  "required": [
+    "name",
+    "template_type",
+    "subject",
+    "body"
+  ],
+  "rls": {
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

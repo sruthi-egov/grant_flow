@@ -1,0 +1,99 @@
+{
+  "name": "MsaKeyClause",
+  "type": "object",
+  "properties": {
+    "msa_id": {
+      "type": "string",
+      "description": "Reference to the parent MSA"
+    },
+    "clause_title": {
+      "type": "string",
+      "description": "Name or title of the clause"
+    },
+    "clause_name": {
+      "type": "string",
+      "description": "Legacy name field (kept for backwards compat)"
+    },
+    "clause_type": {
+      "type": "string",
+      "enum": [
+        "Commercial",
+        "Legal",
+        "Operational",
+        "Compliance",
+        "Risk",
+        "Other"
+      ],
+      "default": "Legal"
+    },
+    "clause_number": {
+      "type": "string",
+      "description": "Clause/section number e.g. Clause 5.2"
+    },
+    "clause_reference": {
+      "type": "string",
+      "description": "Section or clause reference in document (legacy)"
+    },
+    "summary": {
+      "type": "string",
+      "description": "Short summary of the clause"
+    },
+    "full_text": {
+      "type": "string",
+      "description": "Full verbatim clause text from the agreement"
+    },
+    "risk_level": {
+      "type": "string",
+      "enum": [
+        "Low",
+        "Medium",
+        "High"
+      ],
+      "default": "Medium"
+    },
+    "obligation_owner": {
+      "type": "string",
+      "description": "Who is responsible \u2014 Vendor, Client, Both"
+    },
+    "notice_period_days": {
+      "type": "string"
+    },
+    "amount_or_cap": {
+      "type": "string"
+    },
+    "source_section": {
+      "type": "string"
+    },
+    "source_page": {
+      "type": "string"
+    },
+    "confidence": {
+      "type": "number"
+    },
+    "extracted_from_pdf": {
+      "type": "boolean",
+      "default": false
+    },
+    "notes": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "msa_id",
+    "clause_title"
+  ],
+  "rls": {
+    "create": {},
+    "read": {},
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

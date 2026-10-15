@@ -1,0 +1,90 @@
+{
+  "name": "DocumentUploadLog",
+  "type": "object",
+  "properties": {
+    "file_name": {
+      "type": "string",
+      "description": "Original file name"
+    },
+    "file_url": {
+      "type": "string",
+      "description": "Uploaded file URL"
+    },
+    "file_hash": {
+      "type": "string",
+      "description": "SHA-256 hash of the file for duplicate detection"
+    },
+    "entity_type": {
+      "type": "string",
+      "enum": [
+        "Grant",
+        "SOW",
+        "MSA",
+        "MOU"
+      ],
+      "description": "Which module/entity this document belongs to"
+    },
+    "entity_id": {
+      "type": "string",
+      "description": "ID of the related entity"
+    },
+    "entity_name": {
+      "type": "string",
+      "description": "Name/title of the related entity for display"
+    },
+    "uploaded_by": {
+      "type": "string",
+      "description": "Email of the uploader"
+    },
+    "is_dpi_relevant": {
+      "type": "boolean",
+      "description": "Whether the document is relevant to DPI"
+    },
+    "dpi_relevance_reason": {
+      "type": "string",
+      "description": "AI-generated reason for DPI relevance classification"
+    },
+    "is_duplicate": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether this was flagged as a potential duplicate"
+    },
+    "is_invalid": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether this document is flagged as invalid"
+    },
+    "invalid_reason": {
+      "type": "string",
+      "description": "Reason why the document was flagged as invalid"
+    },
+    "is_rejected": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether this document failed content validation"
+    },
+    "rejection_reason": {
+      "type": "string",
+      "description": "Human-readable reason why the document was rejected during validation"
+    }
+  },
+  "required": [
+    "file_name",
+    "file_url",
+    "entity_type"
+  ],
+  "rls": {
+    "create": {},
+    "read": {},
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

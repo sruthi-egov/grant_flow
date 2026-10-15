@@ -1,0 +1,64 @@
+{
+  "name": "ReportingDeadline",
+  "type": "object",
+  "properties": {
+    "grant_id": {
+      "type": "string",
+      "description": "Reference to the parent grant"
+    },
+    "report_type": {
+      "type": "string",
+      "description": "e.g. Quarterly Report, Annual Report, Final Report"
+    },
+    "due_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "upcoming",
+        "submitted",
+        "overdue"
+      ],
+      "default": "upcoming"
+    },
+    "notes": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "grant_id",
+    "report_type",
+    "due_date"
+  ],
+  "rls": {
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "read": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "created_by": "{{user.email}}"
+        }
+      ]
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

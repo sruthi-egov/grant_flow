@@ -1,0 +1,278 @@
+{
+  "name": "SOW",
+  "type": "object",
+  "properties": {
+    "title": {
+      "type": "string",
+      "description": "Title or short description of the SOW"
+    },
+    "vendor_name": {
+      "type": "string",
+      "description": "Name of the vendor/service provider"
+    },
+    "sow_number": {
+      "type": "string",
+      "description": "SOW reference number, e.g. SOW-01"
+    },
+    "grant_id": {
+      "type": "string",
+      "description": "Reference to the parent grant"
+    },
+    "msa_id": {
+      "type": "string",
+      "description": "Reference to the linked MSA"
+    },
+    "vendor_email": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "start_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "end_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "active",
+        "expired",
+        "draft",
+        "terminated"
+      ],
+      "default": "active"
+    },
+    "monthly_rate": {
+      "type": "number",
+      "description": "Monthly rate / fee for this SOW"
+    },
+    "total_value": {
+      "type": "number",
+      "description": "Total contract value"
+    },
+    "payment_day": {
+      "type": "number",
+      "description": "Day of month payment is due, e.g. 1, 15, 30"
+    },
+    "advance_amount": {
+      "type": "number"
+    },
+    "pdf_url": {
+      "type": "string"
+    },
+    "notes": {
+      "type": "string"
+    },
+    "archived": {
+      "type": "boolean",
+      "default": false
+    },
+    "personnel": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "rate_per_month": {
+            "type": "number"
+          },
+          "allocation_percent": {
+            "type": "number"
+          },
+          "role": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "rate_cards": {
+      "type": "array",
+      "description": "All extracted rate card and commercial tables from the SoW PDF",
+      "items": {
+        "type": "object",
+        "properties": {
+          "table_title": {
+            "type": "string"
+          },
+          "table_type": {
+            "type": "string"
+          },
+          "columns": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "currency": {
+            "type": "string"
+          },
+          "billing_frequency": {
+            "type": "string"
+          },
+          "extraction_confidence": {
+            "type": "number"
+          },
+          "notes": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "commercial_tables": {
+      "type": "array",
+      "description": "Additional commercial/pricing tables extracted from the SoW PDF",
+      "items": {
+        "type": "object",
+        "properties": {
+          "table_title": {
+            "type": "string"
+          },
+          "table_type": {
+            "type": "string"
+          },
+          "columns": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "currency": {
+            "type": "string"
+          },
+          "billing_frequency": {
+            "type": "string"
+          },
+          "extraction_confidence": {
+            "type": "number"
+          },
+          "notes": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "payment_schedule_tables": {
+      "type": "array",
+      "description": "Payment schedule tables extracted from the SoW PDF",
+      "items": {
+        "type": "object",
+        "properties": {
+          "table_title": {
+            "type": "string"
+          },
+          "table_type": {
+            "type": "string"
+          },
+          "columns": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "currency": {
+            "type": "string"
+          },
+          "notes": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "normalized_rate_items": {
+      "type": "array",
+      "description": "Normalized flat list of rate items for summary calculations",
+      "items": {
+        "type": "object",
+        "properties": {
+          "role": {
+            "type": "string"
+          },
+          "rate": {
+            "type": "string"
+          },
+          "unit": {
+            "type": "string"
+          },
+          "currency": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "contacts": {
+      "type": "array",
+      "description": "Contacts associated with this SOW \u2014 mandatory notification recipients",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string"
+          },
+          "organization": {
+            "type": "string"
+          },
+          "contact_type": {
+            "type": "string",
+            "description": "e.g. Vendor Contact, Our Contact, Project Manager"
+          },
+          "is_active": {
+            "type": "boolean",
+            "default": true,
+            "description": "Only active contacts receive notifications"
+          }
+        }
+      }
+    }
+  },
+  "required": [
+    "title",
+    "vendor_name"
+  ],
+  "rls": {
+    "create": {},
+    "read": {},
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

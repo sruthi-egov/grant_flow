@@ -1,0 +1,73 @@
+{
+  "name": "GrantTranche",
+  "type": "object",
+  "properties": {
+    "grant_id": {
+      "type": "string",
+      "description": "Reference to the parent grant"
+    },
+    "tranche_name": {
+      "type": "string",
+      "description": "Name of the tranche, e.g. Tranche 1"
+    },
+    "amount": {
+      "type": "number",
+      "description": "Amount for this tranche"
+    },
+    "invoice_trigger_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Date to raise the invoice (triggers alert when \u22647 days away)"
+    },
+    "due_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Date the tranche milestone is due"
+    },
+    "invoice_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Date invoice was sent"
+    },
+    "received_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Date funds were received"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "invoiced",
+        "received",
+        "overdue"
+      ],
+      "default": "pending"
+    },
+    "notes": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "grant_id",
+    "tranche_name"
+  ],
+  "rls": {
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "read": {},
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

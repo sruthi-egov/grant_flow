@@ -1,0 +1,42 @@
+{
+  "name": "User",
+  "type": "object",
+  "properties": {
+    "role": {
+      "type": "string",
+      "enum": [
+        "admin",
+        "user"
+      ],
+      "default": "user"
+    },
+    "allowed_modules": {
+      "type": "array",
+      "description": "Which modules this user can access. Empty/null = all modules.",
+      "items": {
+        "type": "string",
+        "enum": [
+          "Grants",
+          "SOWs",
+          "MSAs",
+          "MOUs"
+        ]
+      }
+    },
+    "display_name": {
+      "type": "string",
+      "description": "Custom display name that overrides the name from the login provider"
+    },
+    "can_upload_pdf": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether this user is allowed to upload PDF documents"
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether this user account is active. False = disabled, cannot log in."
+    }
+  },
+  "required": []
+}

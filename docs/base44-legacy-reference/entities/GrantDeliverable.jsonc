@@ -1,0 +1,94 @@
+{
+  "name": "GrantDeliverable",
+  "type": "object",
+  "properties": {
+    "grant_id": {
+      "type": "string",
+      "description": "Reference to the parent grant"
+    },
+    "name": {
+      "type": "string",
+      "description": "Name or description of the deliverable"
+    },
+    "description": {
+      "type": "string"
+    },
+    "phase": {
+      "type": "string",
+      "description": "Phase or workstream this belongs to"
+    },
+    "category": {
+      "type": "string",
+      "enum": [
+        "Program",
+        "Financial",
+        "Reporting",
+        "Compliance",
+        "Documentation",
+        "Technical",
+        "Other"
+      ],
+      "default": "Other"
+    },
+    "due_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "in_progress",
+        "completed",
+        "overdue"
+      ],
+      "default": "pending"
+    },
+    "acceptance_criteria": {
+      "type": "string"
+    },
+    "priority": {
+      "type": "string",
+      "enum": [
+        "Low",
+        "Medium",
+        "High"
+      ],
+      "default": "Medium"
+    },
+    "source_section": {
+      "type": "string"
+    },
+    "extraction_confidence": {
+      "type": "number"
+    },
+    "extracted_from_pdf": {
+      "type": "boolean",
+      "default": false
+    },
+    "source_document_id": {
+      "type": "string"
+    },
+    "notes": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "grant_id",
+    "name"
+  ],
+  "rls": {
+    "create": {},
+    "read": {},
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

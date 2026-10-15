@@ -1,0 +1,91 @@
+{
+  "name": "SowMilestone",
+  "type": "object",
+  "properties": {
+    "sow_id": {
+      "type": "string",
+      "description": "Reference to the parent SOW"
+    },
+    "title": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "milestone_type": {
+      "type": "string",
+      "enum": [
+        "Payment",
+        "Delivery",
+        "Review",
+        "Release",
+        "Support",
+        "Documentation",
+        "Other"
+      ],
+      "default": "Payment"
+    },
+    "due_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "percentage": {
+      "type": "string",
+      "description": "e.g. 20%"
+    },
+    "amount": {
+      "type": "number"
+    },
+    "currency": {
+      "type": "string",
+      "default": "USD"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "invoiced",
+        "paid",
+        "overdue"
+      ],
+      "default": "pending"
+    },
+    "acceptance_criteria": {
+      "type": "string"
+    },
+    "source_section": {
+      "type": "string"
+    },
+    "extraction_confidence": {
+      "type": "number"
+    },
+    "extracted_from_pdf": {
+      "type": "boolean",
+      "default": false
+    },
+    "source_document_id": {
+      "type": "string"
+    },
+    "notes": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "sow_id",
+    "title"
+  ],
+  "rls": {
+    "create": {},
+    "read": {},
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

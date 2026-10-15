@@ -1,0 +1,60 @@
+{
+  "name": "AppSettings",
+  "type": "object",
+  "properties": {
+    "notifications_enabled": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether automated email notifications are enabled"
+    },
+    "days_before": {
+      "type": "number",
+      "default": 7,
+      "description": "Days before due date to send reminder emails"
+    },
+    "alert_emails": {
+      "type": "array",
+      "description": "List of email addresses to receive automated due date alerts",
+      "items": {
+        "type": "string"
+      }
+    },
+    "environment_name": {
+      "type": "string",
+      "enum": [
+        "production",
+        "staging"
+      ],
+      "default": "production",
+      "description": "App environment label"
+    },
+    "environment_label_enabled": {
+      "type": "boolean",
+      "default": false,
+      "description": "Show environment label in the app header"
+    }
+  },
+  "required": [],
+  "rls": {
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

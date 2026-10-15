@@ -1,0 +1,48 @@
+{
+  "name": "GrantHealthScoreConfig",
+  "type": "object",
+  "properties": {
+    "parameter_key": {
+      "type": "string",
+      "description": "Unique key for the parameter, e.g. milestone_completion"
+    },
+    "parameter_name": {
+      "type": "string",
+      "description": "Human-readable parameter name"
+    },
+    "weightage": {
+      "type": "number",
+      "description": "Weightage percentage (0-100)"
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true
+    },
+    "updated_by": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "parameter_key",
+    "parameter_name",
+    "weightage"
+  ],
+  "rls": {
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "read": {},
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

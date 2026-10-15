@@ -1,0 +1,169 @@
+{
+  "name": "MSA",
+  "type": "object",
+  "properties": {
+    "title": {
+      "type": "string",
+      "description": "Short title, e.g. MSA with BAO Systems"
+    },
+    "vendor_name": {
+      "type": "string",
+      "description": "Name of the service provider / second party"
+    },
+    "msa_number": {
+      "type": "string",
+      "description": "MSA reference number"
+    },
+    "vendor_address": {
+      "type": "string"
+    },
+    "vendor_contact_name": {
+      "type": "string"
+    },
+    "vendor_contact_email": {
+      "type": "string"
+    },
+    "our_contact_name": {
+      "type": "string"
+    },
+    "our_contact_email": {
+      "type": "string"
+    },
+    "effective_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "end_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "initial_term_years": {
+      "type": "number"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "active",
+        "expired",
+        "draft",
+        "terminated"
+      ],
+      "default": "active"
+    },
+    "governing_law": {
+      "type": "string",
+      "description": "Governing law jurisdiction"
+    },
+    "auto_renew": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether the MSA auto-renews"
+    },
+    "notice_period": {
+      "type": "string",
+      "description": "Notice period required to terminate, e.g. 30 days"
+    },
+    "liability_cap": {
+      "type": "string",
+      "description": "Cap on liability, e.g. 12 months fees"
+    },
+    "ip_ownership": {
+      "type": "string",
+      "description": "IP ownership terms"
+    },
+    "description": {
+      "type": "string"
+    },
+    "key_terms": {
+      "type": "string"
+    },
+    "pdf_url": {
+      "type": "string"
+    },
+    "notes": {
+      "type": "string"
+    },
+    "archived": {
+      "type": "boolean",
+      "default": false
+    },
+    "structured_services": {
+      "type": "array",
+      "description": "Structured scope-of-services rows extracted from the MSA",
+      "items": {
+        "type": "object",
+        "properties": {
+          "service_category": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "responsibility": {
+            "type": "string"
+          },
+          "limitations_or_notes": {
+            "type": "string"
+          },
+          "source_section": {
+            "type": "string"
+          },
+          "source_clause": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "contacts": {
+      "type": "array",
+      "description": "Contacts associated with this MSA \u2014 mandatory notification recipients",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string"
+          },
+          "organization": {
+            "type": "string"
+          },
+          "contact_type": {
+            "type": "string",
+            "description": "e.g. Vendor Contact, Our Contact, Legal, Finance"
+          },
+          "is_active": {
+            "type": "boolean",
+            "default": true,
+            "description": "Only active contacts receive notifications"
+          }
+        }
+      }
+    }
+  },
+  "required": [
+    "title",
+    "vendor_name"
+  ],
+  "rls": {
+    "create": {},
+    "read": {},
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

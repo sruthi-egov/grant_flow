@@ -1,0 +1,107 @@
+{
+  "name": "NotificationLog",
+  "type": "object",
+  "properties": {
+    "rule_id": {
+      "type": "string"
+    },
+    "rule_name": {
+      "type": "string"
+    },
+    "notification_type": {
+      "type": "string",
+      "enum": [
+        "upcoming",
+        "overdue",
+        "test"
+      ],
+      "default": "upcoming"
+    },
+    "record_type": {
+      "type": "string"
+    },
+    "record_id": {
+      "type": "string"
+    },
+    "item_type": {
+      "type": "string"
+    },
+    "item_id": {
+      "type": "string"
+    },
+    "item_title": {
+      "type": "string"
+    },
+    "recipient_email": {
+      "type": "string"
+    },
+    "recipient_source": {
+      "type": "string",
+      "enum": [
+        "Record Contact",
+        "Additional Recipient"
+      ],
+      "description": "Whether the recipient is a record-assigned contact or a global additional recipient"
+    },
+    "scheduled_for_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "sent_date": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "sent",
+        "failed",
+        "skipped"
+      ],
+      "default": "sent"
+    },
+    "error_message": {
+      "type": "string"
+    },
+    "retry_count": {
+      "type": "number",
+      "default": 0
+    },
+    "is_test": {
+      "type": "boolean",
+      "default": false,
+      "description": "True if this log entry is from a test email (not a real notification)"
+    },
+    "initiated_by": {
+      "type": "string",
+      "description": "Email of the user who initiated a test email (null for scheduled sends)"
+    }
+  },
+  "required": [
+    "rule_id",
+    "rule_name",
+    "item_id",
+    "item_title",
+    "recipient_email",
+    "scheduled_for_date",
+    "status"
+  ],
+  "rls": {
+    "create": {},
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

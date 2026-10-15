@@ -1,0 +1,118 @@
+{
+  "name": "Grant",
+  "type": "object",
+  "properties": {
+    "title": {
+      "type": "string",
+      "description": "Name or title of the grant"
+    },
+    "funder": {
+      "type": "string",
+      "description": "Funding organization or agency"
+    },
+    "grant_number": {
+      "type": "string",
+      "description": "Contract or award number"
+    },
+    "description": {
+      "type": "string",
+      "description": "Purpose and scope of the grant"
+    },
+    "total_amount": {
+      "type": "number",
+      "description": "Total grant award amount"
+    },
+    "start_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "end_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "active",
+        "pending",
+        "completed",
+        "cancelled",
+        "archived"
+      ],
+      "default": "active"
+    },
+    "reporting_cycle": {
+      "type": "string",
+      "enum": [
+        "monthly",
+        "quarterly",
+        "bi-annual",
+        "annual",
+        "ad-hoc"
+      ],
+      "description": "Frequency of reporting obligations"
+    },
+    "pdf_url": {
+      "type": "string",
+      "description": "URL of the uploaded grant agreement PDF"
+    },
+    "contacts": {
+      "type": "array",
+      "description": "Assigned contacts for this grant \u2014 mandatory notification recipients",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string"
+          },
+          "organization": {
+            "type": "string"
+          },
+          "contact_type": {
+            "type": "string",
+            "description": "e.g. Funder Contact, Program Manager, Finance"
+          },
+          "is_active": {
+            "type": "boolean",
+            "default": true,
+            "description": "Only active contacts receive notifications"
+          }
+        }
+      }
+    },
+    "notification_days_before": {
+      "type": "number",
+      "default": 7
+    },
+    "archived": {
+      "type": "boolean",
+      "default": false
+    }
+  },
+  "required": [
+    "title"
+  ],
+  "rls": {
+    "create": {},
+    "read": {},
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

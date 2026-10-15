@@ -1,0 +1,65 @@
+{
+  "name": "GrantReportingObligation",
+  "type": "object",
+  "properties": {
+    "grant_id": {
+      "type": "string",
+      "description": "Reference to the parent grant"
+    },
+    "obligation_name": {
+      "type": "string"
+    },
+    "obligation_type": {
+      "type": "string",
+      "enum": [
+        "Quarterly Report",
+        "Annual Report",
+        "Audit Submission",
+        "Ad Hoc"
+      ]
+    },
+    "due_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "submitted_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "Pending",
+        "Submitted",
+        "Overdue"
+      ],
+      "default": "Pending"
+    },
+    "notes": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "grant_id",
+    "obligation_name",
+    "due_date"
+  ],
+  "rls": {
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "read": {},
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

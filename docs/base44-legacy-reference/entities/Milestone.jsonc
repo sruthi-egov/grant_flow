@@ -1,0 +1,98 @@
+{
+  "name": "Milestone",
+  "type": "object",
+  "properties": {
+    "grant_id": {
+      "type": "string",
+      "description": "Reference to the parent grant"
+    },
+    "title": {
+      "type": "string",
+      "description": "Milestone name or description"
+    },
+    "description": {
+      "type": "string"
+    },
+    "milestone_type": {
+      "type": "string",
+      "enum": [
+        "Payment",
+        "Reporting",
+        "Program",
+        "Compliance",
+        "Audit",
+        "Review",
+        "Other"
+      ],
+      "default": "Other"
+    },
+    "amount": {
+      "type": "number",
+      "description": "Payment amount for this milestone"
+    },
+    "currency": {
+      "type": "string",
+      "default": "USD"
+    },
+    "percentage": {
+      "type": "string",
+      "description": "Percentage of total, e.g. 20%"
+    },
+    "due_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "paid_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Date the milestone was actually paid"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "invoiced",
+        "paid",
+        "overdue"
+      ],
+      "default": "pending"
+    },
+    "acceptance_criteria": {
+      "type": "string"
+    },
+    "source_section": {
+      "type": "string"
+    },
+    "extraction_confidence": {
+      "type": "number"
+    },
+    "extracted_from_pdf": {
+      "type": "boolean",
+      "default": false
+    },
+    "source_document_id": {
+      "type": "string"
+    },
+    "notes": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "grant_id",
+    "title"
+  ],
+  "rls": {
+    "create": {},
+    "read": {},
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}
