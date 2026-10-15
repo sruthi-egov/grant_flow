@@ -2,6 +2,7 @@
 
 **Last updated:** 2026-10-15
 **Current state:** Migration complete and verified locally. Base44 independence confirmed. Local demo ready.
+Invitation workflow rebuilt and verified (see §9). AI extraction still blocked on a valid API key (§6).
 
 ---
 
@@ -253,6 +254,8 @@ an explicit error for such URLs rather than failing silently.
 
 | Decision | Reason |
 |---|---|
+| Invitation **tokens** rather than emailed passwords | A password in an inbox is a standing credential; a hashed, expiring, single-use token is not. It also removes the window where a new account existed with no permissions set. |
+| Permissions stored **on the invitation** | The old flow created the account and then patched permissions, leaving the user unrestricted in between. |
 | Kept **NestJS** rather than switching to Express | The previous session's manifest chose it and mapped onto every requirement. Nothing depended on it yet, but there was no reason to discard a coherent plan. |
 | Kept the UI in **JSX**, added TypeScript for the new API layer | Converting 180 working components to TSX is a large, risky rewrite with no behavioural benefit. TypeScript is used where the new contracts live. |
 | **Compatibility client** instead of refactoring call sites | Turned an 86-file rewrite into an 84-file rename and preserved all behaviour. |
@@ -262,3 +265,71 @@ an explicit error for such URLs rather than failing silently.
 | **Same-origin `/api`** via Vite/nginx proxy | Makes the document-download cookie work and removes CORS from normal operation. |
 | Non-default host ports (**55432**, 3001, 5173) | Ports 5432 and 4000 were already in use on this machine. |
 | **Seed never deletes** | Fixed UUIDs + upsert, so re-running is safe and your own records are never touched. |
+
+---
+
+## 9. Invitation workflow — rebuilt 2026-10-15
+
+### Why invitations failed
+
+Reproduced against the live API. Five separate faults, none of them SMTP:
+
+| # | Symptom | Cause |
+|---|---|---|
+| 1 | Invite dialog hangs, no error shown | `handleInvite` in `UserAdmin.jsx` had **no try/catch**. A rejected request escaped the async handler, so `setInviting(false)` never ran and no toast appeared. |
+| 2 | **Resend always failed** | `handleResendInvite` called the create-only endpoint, which returns **409 Conflict** for anyone who already exists. |
+| 3 | No invitation existed | The endpoint created a **live account immediately** and emailed a **plaintext temporary password**. No invitation record, no token, no expiry, no single use, and no link in the email. |
+| 4 | `must_change_password` never enforced | The invited user signed in and used the API indefinitely without changing it. |
+| 5 | New users briefly **unrestricted** | The UI created the account, then polled up to five times to PATCH permissions. In that window `allowed_modules: []` meant *all modules*; a failed PATCH left it that way. |
+
+A sixth fault surfaced during verification: `JwtStrategy` compared the JWT `iat`
+claim (whole seconds, per RFC 7519) against `tokens_valid_from` (milliseconds),
+so **any login in the same second as account creation or a password change was
+rejected** with "Session expired". Fixed with a 1-second leeway in both
+`jwt.strategy.ts` and `file-session.guard.ts`.
+
+### What replaced it
+
+| Piece | Behaviour |
+|---|---|
+| `Invitation` model | email, **SHA-256 token hash only**, role, permissions, expiry, `accepted_at`, `revoked_at`, `sent_count`, `invited_by` |
+| `POST /api/users/invite` (admin) | Creates a pending invitation. **No account is created.** |
+| `GET /api/invitations/:token` (public) | Preview for the acceptance page. Returns no secret material. |
+| `POST /api/invitations/:token/accept` (public) | Recipient sets their own password; account created. |
+| `POST /api/admin/invitations/:id/resend` | Issues a **new** token and revokes the previous one. |
+| `DELETE /api/admin/invitations/:id` | Revokes a pending link. |
+| `GET /api/admin/invitations` | Pending-invitation list, surfaced in the UI. |
+| `/invite/:token` (frontend) | Public acceptance page. |
+
+Security properties, each covered by a test:
+
+- Token is 32 random bytes; **only its SHA-256 hash is stored**.
+- **Single use** — `accepted_at` is claimed by a conditional `updateMany` inside the same transaction that creates the user, so two simultaneous submissions cannot both succeed.
+- **Expiring** — `INVITATION_EXPIRY_DAYS`, default 7.
+- **No privilege escalation** — role, modules and upload permission are read from the stored invitation. A `role: "admin"` field in the acceptance body is ignored; verified explicitly.
+- **No duplicate accounts** — inviting an existing account returns 409 with an explanation; resend replaces the token instead of creating a row.
+- Acceptance endpoints are rate limited; the admin endpoints require the admin role.
+
+### Verification
+
+`scripts/verify/invitations.ps1` — **52/52 passing**, covering the full sequence
+(invite → stored → email → link → password → sign in with the assigned role)
+plus single use, expiry, revocation, resend, duplicates, garbage tokens,
+escalation attempts, and that the raw token never reaches the database.
+
+`src/users/invitations.service.spec.ts` — **32 unit tests** on the same rules in
+isolation.
+
+Full regression after the change: **246 checks passing**
+(102 unit + 35 smoke + 43 e2e + 14 persistence + 52 invitations).
+
+### Still unverified
+
+**Browser verification was not possible** — the `chrome-devtools` MCP server
+failed to connect again this session. Everything above was exercised over HTTP
+against the running stack, which is *not* the same as driving the UI. What HTTP
+cannot confirm: the dialog's error toast actually renders, the pending-invitation
+panel paints, and the acceptance form submits from a real browser. The SPA was
+confirmed to serve `/invite/:token` (HTTP 200, app shell, correct title) and the
+preview API the page calls on load returns the right data — so routing is sound,
+but the rendering is unverified. Manual steps are in `LOCAL_DEMO_GUIDE.md` §11.

@@ -5,6 +5,9 @@ import { ExtractJwt, Strategy } from 'passport-jwt';
 import { PrismaService } from '../prisma/prisma.service';
 import type { AuthenticatedUser } from '../common/decorators';
 
+/** Covers the sub-second truncation of the JWT `iat` claim. */
+const IAT_LEEWAY_MS = 1000;
+
 export interface AccessTokenPayload {
   sub: string;
   email: string;
@@ -37,9 +40,17 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     if (!user.is_active) throw new UnauthorizedException('Account disabled');
 
     // Tokens issued before a password change / forced logout are rejected.
-    const issuedAt = payload.iat ? new Date(payload.iat * 1000) : null;
-    if (issuedAt && issuedAt < user.tokens_valid_from) {
-      throw new UnauthorizedException('Session expired, please sign in again');
+    //
+    // `iat` is whole seconds (RFC 7519) while `tokens_valid_from` carries
+    // milliseconds, so a token minted in the same second as the cutoff can
+    // appear up to 999 ms "older" than it really is. Without this leeway a
+    // user who just accepted an invitation or changed their password is
+    // rejected on their very next request.
+    if (payload.iat !== undefined) {
+      const issuedAtMs = payload.iat * 1000;
+      if (issuedAtMs + IAT_LEEWAY_MS < user.tokens_valid_from.getTime()) {
+        throw new UnauthorizedException('Session expired, please sign in again');
+      }
     }
 
     return {

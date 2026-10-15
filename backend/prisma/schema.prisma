@@ -59,6 +59,44 @@ model User {
   @@map("users")
 }
 
+/// A pending invitation to join the application.
+///
+/// The invitation — not the acceptance request — is the authority on the role
+/// and permissions the new account receives, so a recipient cannot escalate
+/// themselves by editing the request body.
+///
+/// Only a SHA-256 hash of the token is stored: a database leak cannot be
+/// replayed as a working invitation link.
+model Invitation {
+  id         String   @id @default(uuid())
+  email      String
+  token_hash String   @unique
+  role       UserRole @default(user)
+
+  /// Permissions applied to the account when the invitation is accepted.
+  allowed_modules String[] @default([])
+  can_upload_pdf  Boolean  @default(false)
+
+  expires_at  DateTime
+  /// Set exactly once, inside a transaction — this is what makes the link single-use.
+  accepted_at DateTime?
+  revoked_at  DateTime?
+
+  invited_by       String
+  accepted_user_id String?
+
+  /// Incremented on resend, so repeated sends are visible without duplicating rows.
+  sent_count   Int      @default(1)
+  last_sent_at DateTime @default(now())
+
+  created_date DateTime @default(now())
+  updated_date DateTime @updatedAt
+
+  @@index([email])
+  @@index([expires_at])
+  @@map("invitations")
+}
+
 model RefreshToken {
   id         String    @id @default(uuid())
   user_id    String

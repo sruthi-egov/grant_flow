@@ -7,6 +7,7 @@ import { BrowserRouter as Router, Route, Routes, Navigate, useLocation } from 'r
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import Login from '@/pages/Login';
+import AcceptInvite from '@/pages/AcceptInvite';
 
 const { Pages, Layout, mainPage } = pagesConfig;
 const mainPageKey = mainPage ?? Object.keys(Pages)[0];
@@ -80,6 +81,10 @@ const AppRoutes = () => (
         </RedirectIfAuthenticated>
       }
     />
+
+    {/* Public: the recipient has no account yet, and must reach this page
+        even while signed out. */}
+    <Route path="/invite/:token" element={<AcceptInvite />} />
 
     <Route
       path="/"

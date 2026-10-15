@@ -53,6 +53,10 @@ export interface AppConfig {
     cron: string;
     timezone: string;
   };
+  invitations: {
+    /** How long an invitation link stays valid. */
+    expiryDays: number;
+  };
   ai: {
     apiKey?: string;
     model: string;
@@ -110,6 +114,10 @@ export default (): AppConfig => {
       // Base44 ran this at 03:30 UTC = 09:00 Asia/Kolkata.
       cron: process.env.NOTIFICATIONS_CRON ?? '30 3 * * *',
       timezone: process.env.NOTIFICATIONS_TIMEZONE ?? 'Asia/Kolkata',
+    },
+
+    invitations: {
+      expiryDays: int(process.env.INVITATION_EXPIRY_DAYS, 7),
     },
 
     ai: {

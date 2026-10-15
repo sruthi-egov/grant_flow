@@ -37,8 +37,10 @@ export default function UserAdmin() {
   const [editName, setEditName] = useState("");
   const [editSaving, setEditSaving] = useState(false);
 
-  // Resend
+  // Pending invitations (people who have not accepted yet, so have no account)
+  const [invitations, setInvitations] = useState([]);
   const [resending, setResending] = useState({});
+  const [revoking, setRevoking] = useState({});
 
   // Disable/Enable confirmation
   const [confirmAction, setConfirmAction] = useState(null); // { type: 'disable'|'enable', user }
@@ -55,7 +57,19 @@ export default function UserAdmin() {
     ]);
     setUsers(allUsers);
     setCurrentUser(me);
+    await loadInvitations();
     setLoading(false);
+  };
+
+  const loadInvitations = async () => {
+    try {
+      const all = await api.invitations.list();
+      // Only invitations still awaiting action are actionable here.
+      setInvitations(all.filter(i => i.status === "pending" || i.status === "expired"));
+    } catch {
+      // Non-fatal: the user list is still usable without this panel.
+      setInvitations([]);
+    }
   };
 
   // is_active missing => treat as true
@@ -95,44 +109,55 @@ export default function UserAdmin() {
     setInviteModules(prev => prev.includes(module) ? prev.filter(m => m !== module) : [...prev, module]);
   };
 
+  /**
+   * Sends an invitation.
+   *
+   * Permissions travel with the invitation and are applied when it is
+   * accepted. The previous implementation created the account first and then
+   * polled for it to patch permissions on, which left a window where the new
+   * user had unrestricted module access.
+   */
   const handleInvite = async () => {
-    if (!inviteEmail) return;
-    setInviting(true);
-    await api.users.inviteUser(inviteEmail, inviteRole);
-
-    if (inviteRole !== "admin") {
-      let newUser = null;
-      for (let attempt = 0; attempt < 5; attempt++) {
-        await new Promise(r => setTimeout(r, 500));
-        const allUsers = await api.entities.User.list();
-        newUser = allUsers.find(u => u.email === inviteEmail);
-        if (newUser) {
-          await api.entities.User.update(newUser.id, {
-            allowed_modules: inviteModules,
-            can_upload_pdf: inviteCanUploadPdf,
-            is_active: true,
-          });
-          setUsers(allUsers.map(u =>
-            u.email === inviteEmail
-              ? { ...u, allowed_modules: inviteModules, can_upload_pdf: inviteCanUploadPdf, is_active: true }
-              : u
-          ));
-          break;
-        }
-        if (attempt === 4) setUsers(allUsers);
-      }
-    } else {
-      const allUsers = await api.entities.User.list();
-      setUsers(allUsers);
+    const email = inviteEmail.trim();
+    if (!email) {
+      toast.error("Enter an email address.");
+      return;
     }
 
-    toast.success(`Invite sent to ${inviteEmail}.`);
-    setInviteEmail("");
-    setInviteRole("user");
-    setInviteModules([...MODULES]);
-    setInviteCanUploadPdf(false);
-    setShowInvite(false);
-    setInviting(false);
+    setInviting(true);
+    try {
+      const result = await api.users.inviteUser(email, inviteRole, {
+        allowed_modules: inviteRole === "admin" ? [] : inviteModules,
+        can_upload_pdf: inviteRole === "admin" ? true : inviteCanUploadPdf,
+      });
+
+      if (result?.email_status === "sent") {
+        toast.success(
+          result.resent
+            ? `New invitation link sent to ${email}. The previous link no longer works.`
+            : `Invitation sent to ${email}.`,
+        );
+      } else {
+        // The invitation exists; only delivery failed. Say so rather than
+        // claiming success.
+        toast.warning(
+          `Invitation created for ${email}, but the email could not be delivered ` +
+          `(${result?.email_status ?? "unknown"}). Check the mail settings, then use Resend.`,
+        );
+      }
+
+      await loadInvitations();
+      setInviteEmail("");
+      setInviteRole("user");
+      setInviteModules([...MODULES]);
+      setInviteCanUploadPdf(false);
+      setShowInvite(false);
+    } catch (err) {
+      // Surface the backend's reason instead of leaving the dialog stuck.
+      toast.error(err?.message || "Could not send the invitation. Please try again.");
+    } finally {
+      setInviting(false);
+    }
   };
 
   const openEditUser = (user) => {
@@ -140,15 +165,41 @@ export default function UserAdmin() {
     setEditName(user.display_name || user.full_name || "");
   };
 
-  const handleResendInvite = async (user) => {
-    setResending(s => ({ ...s, [user.id]: true }));
+  /**
+   * Issues a new token for a pending invitation and emails it again.
+   * The previous link stops working, so a forwarded old email cannot be used.
+   */
+  const handleResendInvite = async (invitation) => {
+    setResending(s => ({ ...s, [invitation.id]: true }));
     try {
-      await api.users.inviteUser(user.email, user.role || "user");
-      toast.success(`Invitation resent to ${user.email}.`);
-    } catch {
-      toast.error("Unable to resend invitation. Please try again.");
+      const result = await api.invitations.resend(invitation.id);
+      if (result?.email_status === "sent") {
+        toast.success(`New invitation link sent to ${invitation.email}. The previous link no longer works.`);
+      } else {
+        toast.warning(
+          `New link created for ${invitation.email}, but the email could not be delivered ` +
+          `(${result?.email_status ?? "unknown"}).`,
+        );
+      }
+      await loadInvitations();
+    } catch (err) {
+      toast.error(err?.message || "Unable to resend the invitation. Please try again.");
+    } finally {
+      setResending(s => ({ ...s, [invitation.id]: false }));
     }
-    setResending(s => ({ ...s, [user.id]: false }));
+  };
+
+  const handleRevokeInvite = async (invitation) => {
+    setRevoking(s => ({ ...s, [invitation.id]: true }));
+    try {
+      await api.invitations.revoke(invitation.id);
+      toast.success(`Invitation for ${invitation.email} cancelled. The link no longer works.`);
+      await loadInvitations();
+    } catch (err) {
+      toast.error(err?.message || "Unable to cancel the invitation.");
+    } finally {
+      setRevoking(s => ({ ...s, [invitation.id]: false }));
+    }
   };
 
   const saveEditUser = async () => {
@@ -255,10 +306,82 @@ export default function UserAdmin() {
         <div>
           <p className="font-medium">How user invitation works</p>
           <p className="text-blue-700 mt-0.5">
-            Invited users receive an email with a link to set their password. They can then log in using their email address and the password they create. Alternatively, if their email is a Gmail/Google account, they can use "Login with Google" on the login screen.
+            An invited person receives an email containing a single-use link. Opening it lets them choose
+            their own password and activates their account with the role and module access you set here —
+            they cannot change those themselves. The link expires, and no account exists until they accept.
           </p>
         </div>
       </div>
+
+      {invitations.length > 0 && (
+        <Card className="mb-6 border-amber-200 bg-amber-50/40">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <Mail className="w-4 h-4 text-amber-600" />
+              <h2 className="font-semibold">Pending invitations ({invitations.length})</h2>
+            </div>
+            <p className="text-xs text-muted-foreground mb-3">
+              These people have been invited but have not created their account yet. No user account
+              exists for them until they accept.
+            </p>
+            <div className="space-y-2">
+              {invitations.map(inv => {
+                const expired = inv.status === "expired";
+                return (
+                  <div
+                    key={inv.id}
+                    className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 bg-background border border-border rounded-lg px-3 py-2"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium truncate">{inv.email}</p>
+                      <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                        <Badge className="bg-muted text-muted-foreground">{inv.role}</Badge>
+                        {expired ? (
+                          <Badge className="bg-red-100 text-red-700 border border-red-200">Expired</Badge>
+                        ) : (
+                          <Badge className="bg-amber-100 text-amber-700 border border-amber-200">
+                            Awaiting acceptance
+                          </Badge>
+                        )}
+                        <span className="text-xs text-muted-foreground">
+                          {expired ? "expired" : "expires"} {new Date(inv.expires_at).toLocaleDateString()}
+                          {inv.sent_count > 1 ? ` · sent ${inv.sent_count}×` : ""}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="gap-1.5"
+                        onClick={() => handleResendInvite(inv)}
+                        disabled={resending[inv.id] || revoking[inv.id]}
+                      >
+                        {resending[inv.id]
+                          ? <Loader2 className="w-3 h-3 animate-spin" />
+                          : <RefreshCw className="w-3 h-3" />}
+                        Resend
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="gap-1.5 text-red-600 hover:text-red-700 hover:bg-red-50"
+                        onClick={() => handleRevokeInvite(inv)}
+                        disabled={resending[inv.id] || revoking[inv.id]}
+                      >
+                        {revoking[inv.id]
+                          ? <Loader2 className="w-3 h-3 animate-spin" />
+                          : <UserX className="w-3 h-3" />}
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="flex flex-wrap items-center gap-3 mb-6">
         <Button onClick={() => setShowInvite(true)} className="gap-2">
@@ -313,7 +436,7 @@ export default function UserAdmin() {
           <div className="space-y-4 mt-2">
             <div className="flex items-start gap-2 bg-muted/50 rounded-md px-3 py-2 text-xs text-muted-foreground">
               <Mail className="w-3.5 h-3.5 mt-0.5 shrink-0" />
-              <span>The user will receive an invitation email with a link to set their password. They can then log in using their email address and chosen password, or via Google if their email is a Gmail account.</span>
+              <span>They will receive a single-use link to choose their own password. The role and module access you set below are applied when they accept and cannot be changed by them.</span>
             </div>
             <div>
               <Label className="mb-1 block">Email address</Label>
@@ -450,16 +573,8 @@ export default function UserAdmin() {
                           <Badge className="bg-green-100 text-green-700 border border-green-200">Active</Badge>
                         )}
                       </div>
-                      {active && isPending(user) && (
-                        <button
-                          onClick={() => handleResendInvite(user)}
-                          disabled={resending[user.id]}
-                          className="mt-1.5 flex items-center gap-1 text-xs text-primary hover:underline disabled:opacity-50"
-                        >
-                          {resending[user.id] ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
-                          Resend invitation
-                        </button>
-                      )}
+                      {/* Invitations are managed in the Pending invitations
+                          panel above; a user row here already has an account. */}
                     </div>
 
                     {/* Module checkboxes */}

@@ -296,9 +296,50 @@ const auth = {
 // ─── Users ──────────────────────────────────────────────────────────────────
 
 const users = {
-  /** Base44 signature: inviteUser(email, role) */
-  inviteUser: (email: string, role: 'admin' | 'user' = 'user') =>
-    request<any>('/users/invite', { method: 'POST', body: { email, role } }),
+  /**
+   * Base44 signature: inviteUser(email, role).
+   * Extended with permissions so the invitation carries them, rather than the
+   * UI creating an account and patching it afterwards.
+   */
+  inviteUser: (
+    email: string,
+    role: 'admin' | 'user' = 'user',
+    options: { allowed_modules?: string[]; can_upload_pdf?: boolean } = {},
+  ) =>
+    request<any>('/users/invite', {
+      method: 'POST',
+      body: {
+        email,
+        role,
+        allowed_modules: options.allowed_modules,
+        can_upload_pdf: options.can_upload_pdf,
+      },
+    }),
+};
+
+/** Invitation lifecycle. */
+const invitations = {
+  /** Admin: every invitation, newest first. */
+  list: () => request<any[]>('/admin/invitations'),
+
+  /** Admin: issue a fresh token and email it again. */
+  resend: (id: string) => request<any>(`/admin/invitations/${id}/resend`, { method: 'POST' }),
+
+  /** Admin: invalidate a pending invitation link. */
+  revoke: (id: string) => request<any>(`/admin/invitations/${id}`, { method: 'DELETE' }),
+
+  /** Public: who is this invitation for? Used by the acceptance page. */
+  preview: (token: string) => request<any>(`/invitations/${encodeURIComponent(token)}`),
+
+  /**
+   * Public: set a password and activate the account.
+   * Role and permissions come from the stored invitation, not from here.
+   */
+  accept: (token: string, payload: { password: string; full_name?: string }) =>
+    request<any>(`/invitations/${encodeURIComponent(token)}/accept`, {
+      method: 'POST',
+      body: payload,
+    }),
 };
 
 // ─── Integrations (Base44 `integrations.Core.*`) ────────────────────────────
@@ -386,6 +427,6 @@ const system = {
   mailStatus: () => request<any>('/notifications/status'),
 };
 
-export const api = { entities, auth, users, integrations, functions, system, request };
+export const api = { entities, auth, users, invitations, integrations, functions, system, request };
 
 export default api;

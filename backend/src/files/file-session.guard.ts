@@ -59,9 +59,13 @@ export class FileSessionGuard implements CanActivate {
       throw new UnauthorizedException('Account is not active');
     }
 
-    const issuedAt = payload.iat ? new Date(payload.iat * 1000) : null;
-    if (issuedAt && issuedAt < user.tokens_valid_from) {
-      throw new UnauthorizedException('Your session has expired. Sign in again to download.');
+    // 1s leeway: `iat` is whole seconds while `tokens_valid_from` has
+    // milliseconds, so a freshly issued token can look marginally too old.
+    if (payload.iat !== undefined) {
+      const issuedAtMs = payload.iat * 1000;
+      if (issuedAtMs + 1000 < user.tokens_valid_from.getTime()) {
+        throw new UnauthorizedException('Your session has expired. Sign in again to download.');
+      }
     }
 
     const authenticated: AuthenticatedUser = {

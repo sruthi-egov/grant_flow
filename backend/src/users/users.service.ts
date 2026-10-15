@@ -135,81 +135,8 @@ export class UsersService {
     return this.toView(updated);
   }
 
-  /**
-   * Creates a user with a generated temporary password.
-   *
-   * Replaces `base44.users.inviteUser`. The credential is emailed through the
-   * configured SMTP server (Mailpit locally, so it is captured, not delivered).
-   * Outside production the password is also returned so a demo operator can
-   * read it without opening the mail UI.
-   */
-  async invite(
-    email: string,
-    role: 'admin' | 'user',
-    actor: AuthenticatedUser,
-  ): Promise<{ user: UserView; temp_password?: string; email_status: string }> {
-    const normalized = (email ?? '').trim().toLowerCase();
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized)) {
-      throw new BadRequestException('A valid email address is required');
-    }
-
-    const existing = await this.prisma.user.findUnique({ where: { email: normalized } });
-    if (existing) {
-      throw new ConflictException(`A user with the email ${normalized} already exists`);
-    }
-
-    // 18 bytes → 24 URL-safe characters, well above the 10-char minimum.
-    const tempPassword = randomBytes(18).toString('base64url');
-
-    const user = await this.prisma.user.create({
-      data: {
-        email: normalized,
-        password_hash: await this.auth.hashPassword(tempPassword),
-        role: role === 'admin' ? 'admin' : 'user',
-        full_name: normalized.split('@')[0],
-        must_change_password: true,
-        is_active: true,
-        created_by: actor.email,
-      },
-    });
-
-    const appUrl = this.config.get<string>('appPublicUrl');
-    const sendResult = await this.mailer.send({
-      to: normalized,
-      subject: '[GrantOS] You have been invited',
-      html: `<div style="font-family: sans-serif; max-width: 600px;">
-        <p>Hello,</p>
-        <p>An account has been created for you in <strong>GrantOS</strong>.</p>
-        <p><strong>Sign-in address:</strong> ${appUrl}<br>
-           <strong>Email:</strong> ${normalized}<br>
-           <strong>Temporary password:</strong> <code>${tempPassword}</code></p>
-        <p>Please sign in and change your password immediately.</p>
-      </div>`,
-    });
-
-    await this.prisma.auditLog
-      .create({
-        data: {
-          action_type: 'user_invited',
-          entity_type: 'User',
-          entity_id: user.id,
-          entity_name: normalized,
-          user_email: actor.email,
-          user_name: actor.display_name ?? actor.email,
-          description: `Invited ${normalized} as ${role}`,
-          status: 'success',
-        },
-      })
-      .catch(() => undefined);
-
-    this.logger.log(`Invited ${normalized} as ${role} (email ${sendResult.status})`);
-
-    return {
-      user: this.toView(user),
-      temp_password: this.config.get<boolean>('isProduction') ? undefined : tempPassword,
-      email_status: sendResult.status,
-    };
-  }
+  // User creation now happens only through InvitationsService.accept(), so the
+  // recipient chooses their own password and no credential is ever emailed.
 
   async remove(id: string, actor: AuthenticatedUser): Promise<{ success: boolean }> {
     if (id === actor.id) {

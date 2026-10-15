@@ -231,6 +231,79 @@ The API key is read only by the backend and is never sent to the browser.
 
 ---
 
+## 6a. Inviting users
+
+An invitation creates **no account**. It stores a pending record and emails a
+**single-use link**; the account is created only when the recipient opens that
+link and chooses their own password. The role and module access you select are
+attached to the invitation and applied on acceptance — the recipient cannot
+change them.
+
+**To invite someone:** Users → *Invite User* → enter the email, pick the role and
+modules → *Send*. They appear under **Pending invitations** until they accept.
+
+From that panel you can **Resend** (issues a new link and kills the old one) or
+**Cancel** (revokes the link immediately).
+
+| Situation | What happens |
+|---|---|
+| Invite an address that already has an account | Refused with an explanation. No duplicate is created. |
+| Invite someone who already has a pending invitation | A new link is issued and the previous one stops working. |
+| Recipient opens a used link | "This invitation has already been used." |
+| Recipient opens an expired link | "This invitation has expired." Resend to issue a new one. |
+| Admin cancels before acceptance | Link stops working immediately. |
+
+Links expire after `INVITATION_EXPIRY_DAYS` (default 7) and can be used once.
+
+> **During the demo, invitation emails go to Mailpit** at <http://localhost:8025>,
+> like every other message. Open the message there and click the link to walk
+> through acceptance.
+
+### Sending a real invitation to a real person
+
+Two things must change first, and **both** matter:
+
+**1. Real SMTP** — replace these five values in `backend/.env`:
+
+```
+SMTP_HOST=            # e.g. smtp.office365.com, smtp.gmail.com, smtp.sendgrid.net
+SMTP_PORT=587
+SMTP_SECURE=false     # true only for implicit TLS on port 465
+SMTP_USER=            # provider username
+SMTP_PASS=            # provider password / API key / app password
+MAIL_FROM_ADDRESS=    # an address on a domain your provider is allowed to send for
+```
+
+`backend/.env.example` has a table of the exact values for Microsoft 365, Google
+Workspace, Amazon SES, SendGrid and Mailgun. Google needs an **App Password**
+(2-Step Verification enabled); a normal account password is rejected.
+
+**2. Allow the recipient's domain.** Mail to any domain not in
+`MAIL_ALLOWED_DOMAINS` is **refused, not sent** — that is the guard stopping demo
+data from emailing real people:
+
+```
+MAIL_ALLOWED_DOMAINS=grantos.local,example.com,example.org,theirdomain.org
+```
+
+**3. Make the link reachable.** `APP_PUBLIC_URL=http://localhost:5173` only
+resolves on *your* machine. A recipient elsewhere receives a link that goes
+nowhere. Set it to something they can open:
+
+| Situation | `APP_PUBLIC_URL` | Notes |
+|---|---|---|
+| Same machine | `http://localhost:5173` | the default; fine for the demo |
+| Same office network | `http://<your-LAN-IP>:5173` | find it with `ipconfig`; the Vite server already listens on all interfaces, but your firewall must allow inbound 5173 |
+| Anywhere else | a tunnel or deployed hostname | e.g. `cloudflared`/`ngrok`, or a real deployment |
+
+Restart the backend after changing any of these. It logs a warning at startup,
+and `/api/notifications/status` reports `links_reachable_externally: false`, if
+real SMTP is configured while the URL is still localhost.
+
+> I have not exposed this application to any network, and no real invitation has
+> been sent. Tell me the recipient address when you want one sent, and I will
+> confirm the configuration first.
+
 ## 7. Troubleshooting
 
 **"Cannot reach the GrantOS API" on the login screen**
@@ -268,10 +341,11 @@ Only admins and users with `can_upload_pdf` may upload. Enable it on the Users p
 ## 8. Re-running the verification suite
 
 ```powershell
-cd backend; npx jest                            # 70 unit tests
+cd backend; npx jest                            # 102 unit tests
 cd ..
 powershell -File scripts\verify\api-smoke.ps1       # 35 API checks
 powershell -File scripts\verify\end-to-end.ps1      # 43 checks through the SPA origin
+powershell -File scripts\verify\invitations.ps1     # 52 checks: full invitation workflow
 powershell -File scripts\verify\persistence.ps1     # 14 checks: restart, data survives
 powershell -File scripts\verify\clean-database.ps1  # 15 checks: fresh install, isolated DB
 ```
@@ -284,6 +358,74 @@ your primary `grantos` database.
 All five scripts create their own records and clean up after themselves.
 
 ---
+
+## 8a. Manual browser verification of invitations
+
+Browser automation was **not available** in the session that built this — the
+`chrome-devtools` MCP server failed to connect. Everything below was verified
+over HTTP, which confirms the API and routing but **not** that the UI renders.
+These steps close that gap. They take about five minutes.
+
+Use a **second browser profile or a private window** for the invitee so you are
+not signed in as the admin.
+
+**A. Send the invitation**
+1. Sign in at <http://localhost:5173> as `admin@grantos.local`.
+2. Users → **Invite User**. Email `newcolleague@grantos.local`, role **user**,
+   tick **Grants** and **MOUs** only, leave PDF upload off. Send.
+3. ✅ A success toast appears and the dialog closes.
+4. ✅ A **Pending invitations** panel shows the address, role, and expiry date.
+5. ✅ The Users list does **not** yet contain that address.
+
+**B. Check the email**
+6. Open <http://localhost:8025>. ✅ A message "You have been invited to GrantOS".
+7. ✅ It contains an **Accept your invitation** button, **no password**, and says
+   the link can only be used once.
+
+**C. Accept it (private window)**
+8. Copy the link, open it in a **private window**.
+9. ✅ The page shows the email, role **user**, who invited them, and the expiry.
+10. Try a weak password like `password`. ✅ Rejected with the rule explained.
+11. Enter `NewColleague!2026` twice and submit.
+12. ✅ "Account created", then a redirect to the sign-in page.
+
+**D. Sign in as the new user**
+13. Sign in with `newcolleague@grantos.local` / `NewColleague!2026`.
+14. ✅ You land on the dashboard.
+15. ✅ The sidebar shows **Grants** and **MOUs** but **not** SOWs, MSAs or Users.
+16. ✅ Opening a grant is read-only — no Save on edit forms.
+
+**E. Single use**
+17. Back in the private window, reload the invitation link.
+18. ✅ "This invitation has already been used."
+
+**F. Resend and cancel**
+19. As admin, invite `another@grantos.local`. In **Pending invitations** click
+    **Resend**. ✅ Toast says the previous link no longer works.
+20. ✅ Mailpit shows a second email with a *different* link.
+21. Open the **first** link. ✅ "This invitation is no longer valid."
+22. Click **Cancel** on that invitation. ✅ It disappears from the panel.
+23. Open the **second** link. ✅ Also rejected.
+
+**G. Expired link** (optional — needs a database command)
+```powershell
+docker exec grantos-postgres psql -U grantos -d grantos `
+  -c "UPDATE invitations SET expires_at = now() - interval '1 day' WHERE accepted_at IS NULL"
+```
+24. Open any pending link. ✅ "This invitation has expired."
+
+**H. Console and network**
+25. With DevTools open (F12) during the above: ✅ no uncaught errors in Console,
+    and ✅ no request to any `base44` host in Network.
+
+**Clean up afterwards**
+```powershell
+# removes the demo invitees, leaves seeded accounts untouched
+docker exec grantos-postgres psql -U grantos -d grantos `
+  -c "DELETE FROM users WHERE email IN ('newcolleague@grantos.local','another@grantos.local')"
+docker exec grantos-postgres psql -U grantos -d grantos `
+  -c "DELETE FROM invitations WHERE email IN ('newcolleague@grantos.local','another@grantos.local')"
+```
 
 ## 9. Deploying later (not required for the demo)
 

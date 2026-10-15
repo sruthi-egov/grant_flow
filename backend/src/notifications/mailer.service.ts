@@ -42,13 +42,51 @@ export class MailerService implements OnModuleInit {
     void this.verify();
   }
 
+  /**
+   * True when SMTP looks like a local capture tool rather than a real relay.
+   * Used to decide whether an emailed localhost link is harmless or a problem.
+   */
+  get isLocalCapture(): boolean {
+    const mail = this.config.get<any>('mail');
+    const host = String(mail.host ?? '').toLowerCase();
+    return (
+      host === 'localhost' ||
+      host === '127.0.0.1' ||
+      host === 'mailpit' ||
+      host === 'mailhog' ||
+      host.endsWith('.local')
+    );
+  }
+
+  /**
+   * Warns when real email delivery is configured but the links inside those
+   * emails point at localhost — recipients on another machine would receive an
+   * invitation they cannot open.
+   */
+  private warnIfLinksUnreachable(): void {
+    const appUrl = String(this.config.get<string>('appPublicUrl') ?? '');
+    const isLocalUrl = /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?/i.test(appUrl);
+
+    if (!this.isLocalCapture && isLocalUrl) {
+      this.logger.warn(
+        `Real SMTP is configured (${this.config.get<string>('mail.host')}) but APP_PUBLIC_URL is "${appUrl}". ` +
+          'Invitation and notification links will not open on any other machine. ' +
+          'Set APP_PUBLIC_URL to an address recipients can reach before sending real email.',
+      );
+    }
+  }
+
   async verify(): Promise<boolean> {
     try {
       await this.transporter.verify();
       this.verified = true;
       this.lastVerifyError = null;
       const mail = this.config.get<any>('mail');
-      this.logger.log(`SMTP ready at ${mail.host}:${mail.port}`);
+      this.logger.log(
+        `SMTP ready at ${mail.host}:${mail.port}` +
+          (this.isLocalCapture ? ' (local capture — nothing is delivered externally)' : ' (REAL DELIVERY)'),
+      );
+      this.warnIfLinksUnreachable();
       return true;
     } catch (error: any) {
       this.verified = false;
@@ -62,6 +100,9 @@ export class MailerService implements OnModuleInit {
 
   get status() {
     const mail = this.config.get<any>('mail');
+    const appUrl = String(this.config.get<string>('appPublicUrl') ?? '');
+    const isLocalUrl = /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?/i.test(appUrl);
+
     return {
       configured: true,
       reachable: this.verified,
@@ -70,6 +111,14 @@ export class MailerService implements OnModuleInit {
       from: `${mail.fromName} <${mail.fromAddress}>`,
       allowed_domains: mail.allowedDomains,
       last_error: this.lastVerifyError,
+      // Makes it obvious on the Settings page whether mail leaves the machine.
+      mode: this.isLocalCapture ? 'local_capture' : 'real_delivery',
+      app_public_url: appUrl,
+      links_reachable_externally: !isLocalUrl,
+      warning:
+        !this.isLocalCapture && isLocalUrl
+          ? 'Real email is configured but links point at localhost, so recipients on other machines cannot open them. Set APP_PUBLIC_URL.'
+          : null,
     };
   }
 
