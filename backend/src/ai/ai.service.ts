@@ -96,11 +96,13 @@ export class AiService {
         max_tokens: options.maxTokens ?? 8000,
       });
     } catch (error: any) {
-      const detail = error?.message ?? String(error);
-      this.logger.error(`OpenAI request failed: ${detail}`);
+      // The provider's raw message can embed credentials and account detail, so
+      // it is logged server-side and translated into a safe, actionable
+      // message for the browser.
+      this.logger.error(`OpenAI request failed: ${error?.message ?? String(error)}`);
       throw new ServiceUnavailableException({
         error: 'ai_request_failed',
-        message: `The AI provider rejected or failed the request: ${detail}`,
+        ...this.describeProviderError(error),
       });
     }
 
@@ -123,6 +125,47 @@ export class AiService {
         completion_tokens: response.usage?.completion_tokens,
       },
     };
+  }
+
+  /**
+   * Maps a provider failure to a message that tells an operator what to fix,
+   * without echoing the provider's raw text (which can contain a masked key,
+   * org identifiers or quota detail).
+   */
+  private describeProviderError(error: any): { message: string; reason: string } {
+    const status: number | undefined = error?.status ?? error?.response?.status;
+
+    switch (status) {
+      case 401:
+      case 403:
+        return {
+          reason: 'invalid_credentials',
+          message:
+            'The AI provider rejected the configured credentials. Check OPENAI_API_KEY in the backend ' +
+            'environment — it is missing, expired, or revoked. No data was extracted.',
+        };
+      case 429:
+        return {
+          reason: 'rate_limited_or_quota',
+          message:
+            'The AI provider refused the request for rate-limit or quota reasons. Check the usage ' +
+            'limits on the account, then retry. No data was extracted.',
+        };
+      case 404:
+        return {
+          reason: 'model_unavailable',
+          message:
+            `The configured model (${this.config.get<string>('ai.model')}) is not available to this ` +
+            'account. Set OPENAI_MODEL to a model the account can use. No data was extracted.',
+        };
+      default:
+        return {
+          reason: 'provider_error',
+          message:
+            'The AI provider could not complete the request. The full error is in the backend logs. ' +
+            'No data was extracted.',
+        };
+    }
   }
 
   /** Tolerates a stray code fence, but never fabricates a result. */

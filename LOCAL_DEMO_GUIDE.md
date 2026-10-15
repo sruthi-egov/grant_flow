@@ -203,10 +203,18 @@ $t = (Invoke-RestMethod http://127.0.0.1:3001/api/auth/login -Method Post -Conte
 Invoke-RestMethod http://127.0.0.1:3001/api/ai/status -Headers @{Authorization="Bearer $t"}
 ```
 
-> **Note for this machine:** an `OPENAI_API_KEY` is already set in your Windows *user* environment, so the backend
-> picks it up and reports `enabled: true`. Calls are billed to that account. Setting `OPENAI_API_KEY=` (empty) in
-> `backend/.env` does **not** override it — dotenv never overwrites an existing process variable. To genuinely
-> disable it for a session: `$env:OPENAI_API_KEY=''` in the terminal before `npm run start:dev`.
+> **⚠️ Note for this machine.** An `OPENAI_API_KEY` is set in your Windows *user* environment, so the backend picks
+> it up and `/api/ai/status` reports `enabled: true` — but **OpenAI rejects it**: a real extraction run returned
+> `401 Incorrect API key provided`. The key is expired, revoked, or mistyped. Until it is replaced, extraction
+> will fail with a clear "credentials rejected" message. Everything else in the app is unaffected.
+>
+> To fix: put a working key in `backend/.env` **and** clear the stale one from your environment
+> (`[Environment]::SetEnvironmentVariable('OPENAI_API_KEY', $null, 'User')`, then open a new terminal) — an empty
+> value in `.env` does **not** override an inherited variable, because dotenv never overwrites an existing
+> process variable.
+>
+> To disable AI cleanly for a demo instead: `$env:OPENAI_API_KEY=''` in the terminal before `npm run start:dev`.
+> Extraction then reports `503 ai_not_configured`, which is the honest "not set up" state.
 
 To test extraction end to end, upload a **text-layer** PDF to a grant in the UI and use *Extract from PDF*.
 Expect: deliverables and milestones proposed for review before anything is saved.

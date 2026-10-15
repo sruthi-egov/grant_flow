@@ -166,10 +166,38 @@ reason the baseline commit was made first.
 
 | Item | Status | Why | How to resolve |
 |---|---|---|---|
-| **Live AI extraction** | ⚠️ Not run | An `OPENAI_API_KEY` is present in the Windows *user* environment, so calls would be billed to that account. Not spent without approval. | See `LOCAL_DEMO_GUIDE.md` → "Verifying AI extraction". One run costs well under $0.01. |
+| **Live AI extraction** | ❌ **Blocked — the API key is invalid** | Ran with approval. The `OPENAI_API_KEY` in the Windows *user* environment is rejected by OpenAI: `401 Incorrect API key provided`. The key is expired, revoked, or mistyped. | Set a valid key and re-run `scripts/verify/` or use the UI. See below. |
 | **Browser UI verification** | ⚠️ Not done | The `chrome-devtools` MCP server failed to connect this session. | Manual steps in `LOCAL_DEMO_GUIDE.md` → "Five-minute walkthrough". |
 | **Base44 data import** | ❌ Not possible | The export contains **source code and schema only** — no database rows and no uploaded PDFs. | Requires a data export from Base44. See §7. |
 | `inviteUser`, `sendTestNotification`, DB reset, file cleanup | Implemented, not exercised | Destructive or needs a UI flow. | Exercise manually during the demo. |
+
+#### What the AI extraction attempt established
+
+The run was approved and executed against the real endpoint. It got as far as the provider and failed there:
+
+| Stage | Result |
+|---|---|
+| Upload and store the PDF | ✅ worked |
+| Resolve `pdf_url` → stored file | ✅ worked |
+| Extract the text layer (`unpdf`) | ✅ **803 characters from 1 page** |
+| Build the prompt and call OpenAI | ❌ `401 Incorrect API key provided` |
+| Report the failure | ✅ `503`, nothing fabricated, nothing saved |
+
+So everything this migration is responsible for works; only the external credential is bad. The model call itself
+remains **unverified**.
+
+The run also exposed a leak: the provider's raw error — which embeds a partially-masked key and account URLs —
+was being passed straight through to the browser. Provider errors are now logged in full server-side and
+translated into a safe, actionable message (`invalid_credentials`, `rate_limited_or_quota`, `model_unavailable`,
+`provider_error`).
+
+To finish this check, set a working key and retry:
+
+```powershell
+$env:OPENAI_API_KEY = 'sk-...'      # or edit backend/.env
+cd backend; npm run start:dev       # restart so it is picked up
+# then use "Extract from PDF" on a grant in the UI with a text-layer PDF
+```
 
 ### Known limitations
 
