@@ -24,6 +24,43 @@ import { resolve } from 'node:path';
 /** Variables whose values must never be logged. */
 const SECRET_NAMES = /(KEY|SECRET|PASSWORD|PASS|TOKEN|DSN|CREDENTIAL)/i;
 
+/**
+ * Every variable the application actually reads.
+ *
+ * Anything else found in .env is reported at startup. This catches the common
+ * failure where a value is set under a plausible-but-wrong name (EMAIL_FROM
+ * instead of MAIL_FROM_ADDRESS, say) and silently has no effect.
+ */
+const RECOGNISED = new Set([
+  'NODE_ENV', 'PORT', 'CORS_ORIGINS', 'APP_PUBLIC_URL',
+  'DATABASE_URL',
+  'JWT_ACCESS_SECRET', 'JWT_REFRESH_SECRET', 'JWT_ACCESS_TTL', 'JWT_REFRESH_TTL',
+  'SEED_ADMIN_EMAIL', 'SEED_ADMIN_PASSWORD', 'SEED_USER_EMAIL', 'SEED_USER_PASSWORD',
+  'UPLOAD_DIR', 'MAX_UPLOAD_MB',
+  'SMTP_HOST', 'SMTP_PORT', 'SMTP_SECURE', 'SMTP_USER', 'SMTP_PASS',
+  'MAIL_FROM_NAME', 'MAIL_FROM_ADDRESS', 'MAIL_ALLOWED_DOMAINS', 'MAIL_DRY_RUN',
+  'NOTIFICATIONS_CRON_ENABLED', 'NOTIFICATIONS_CRON', 'NOTIFICATIONS_TIMEZONE',
+  'INVITATION_EXPIRY_DAYS',
+  'OPENAI_API_KEY', 'OPENAI_MODEL', 'OPENAI_BASE_URL', 'AI_MAX_INPUT_CHARS',
+  'K8S_NAMESPACE', 'SEED_ON_START',
+]);
+
+/** Suggests the correct name for a few likely mistakes. */
+const SUGGESTIONS: Record<string, string> = {
+  EMAIL_FROM: 'MAIL_FROM_ADDRESS (plus MAIL_FROM_NAME for the display name)',
+  MAIL_FROM: 'MAIL_FROM_ADDRESS',
+  EMAIL_FROM_NAME: 'MAIL_FROM_NAME',
+  EMAIL_HOST: 'SMTP_HOST',
+  EMAIL_PORT: 'SMTP_PORT',
+  EMAIL_USER: 'SMTP_USER',
+  EMAIL_PASS: 'SMTP_PASS',
+  EMAIL_PASSWORD: 'SMTP_PASS',
+  GMAIL_USER: 'SMTP_USER',
+  GMAIL_APP_PASSWORD: 'SMTP_PASS',
+  OPENAI_KEY: 'OPENAI_API_KEY',
+  OPENAI_SECRET_KEY: 'OPENAI_API_KEY',
+};
+
 export interface EnvLoadReport {
   file: string;
   loaded: boolean;
@@ -33,6 +70,8 @@ export interface EnvLoadReport {
   overridden: string[];
   /** Names left as inherited because the file value was empty. */
   deferred: string[];
+  /** Names present in .env that the application never reads. */
+  unrecognised: string[];
 }
 
 function parse(contents: string): Map<string, string> {
@@ -72,6 +111,7 @@ export function loadEnv(cwd: string = process.cwd()): EnvLoadReport {
     applied: [],
     overridden: [],
     deferred: [],
+    unrecognised: [],
   };
 
   if (!existsSync(file)) return report;
@@ -80,6 +120,10 @@ export function loadEnv(cwd: string = process.cwd()): EnvLoadReport {
   const values = parse(readFileSync(file, 'utf8'));
 
   for (const [key, value] of values) {
+    if (!RECOGNISED.has(key) && value !== '') {
+      report.unrecognised.push(key);
+    }
+
     const inherited = process.env[key];
     const hasInherited = inherited !== undefined && inherited !== '';
 
@@ -127,6 +171,14 @@ export function describeEnvLoad(report: EnvLoadReport): string[] {
     lines.push(
       `.env left blank, so the inherited value is still in use for: ${names}. ` +
         'Set it in .env, or clear it from your environment, if that is not what you want.',
+    );
+  }
+
+  for (const name of report.unrecognised) {
+    const hint = SUGGESTIONS[name];
+    lines.push(
+      `.env sets ${name}, which this application does not read — it has no effect.` +
+        (hint ? ` Did you mean ${hint}?` : ''),
     );
   }
 

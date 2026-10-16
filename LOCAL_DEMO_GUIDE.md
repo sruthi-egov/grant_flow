@@ -125,26 +125,76 @@ docker compose exec backend npx prisma db seed
 
 ---
 
-## 4. What email does during the demo
+## 4. Email delivery
 
-**No email leaves this machine.** The backend is pointed at Mailpit, a local SMTP sink, and every
-message — digests, invitations, test sends — is captured at <http://localhost:8025>.
+Mail is sent through a **real SMTP provider** configured in `backend/.env`.
+There is no mail container in `docker-compose.yml` any more.
 
-There is also a second safety net: `MAIL_ALLOWED_DOMAINS` in `backend/.env` restricts recipients to
-`grantos.local`, `example.com` and `example.org`. Even if SMTP were repointed at a real relay with demo
-data loaded, mail to any other domain is refused rather than sent.
+| Variable | Purpose |
+|---|---|
+| `SMTP_HOST` | `smtp.gmail.com` |
+| `SMTP_PORT` | `587` |
+| `SMTP_SECURE` | `false` — selects **STARTTLS** on 587. It does *not* mean unencrypted: the backend sets `requireTLS`, so a server that refuses the upgrade is rejected rather than sent to in clear text. |
+| `SMTP_USER` | the **full Gmail address** that authenticates |
+| `SMTP_PASS` | the 16-character **App Password** (2-Step Verification required; a normal password is rejected). Google's display spaces are stripped automatically. |
+| `MAIL_FROM_NAME` | display name on the From header |
+| `MAIL_FROM_ADDRESS` | **must equal `SMTP_USER`** unless you have a verified alias — Gmail rewrites or rejects anything else. The backend warns at startup if they differ. |
+| `MAIL_ALLOWED_DOMAINS` | recipient allow-list, enforced for real delivery |
+| `MAIL_DRY_RUN` | compose but never transmit. A dry run reports `skipped`, never `sent`. |
 
-Trigger a notification run on demand:
+Check the live state at any time:
+
+```powershell
+$t = (Invoke-RestMethod http://localhost:5173/api/auth/login -Method Post -ContentType 'application/json' `
+      -Body '{"email":"admin@grantos.local","password":"DemoAdmin!2026"}').access_token
+Invoke-RestMethod http://localhost:5173/api/notifications/status -Headers @{Authorization="Bearer $t"}
+```
+
+`mode` is `real_delivery`, `local_capture` or `dry_run`, and `reachable` reports
+whether SMTP authentication actually succeeded.
+
+### ⚠️ The notification cron will email the demo contacts
+
+`NOTIFICATIONS_CRON_ENABLED=true` runs the daily pass at 03:30 UTC. The seeded
+demo records contain fictional `@grantos.local` contacts on a domain that does
+not resolve. With real SMTP configured, each run attempts delivery to those
+addresses and every one bounces, which harms the sending account's reputation.
+
+Before leaving a real provider configured overnight, do one of:
+
+- set `NOTIFICATIONS_CRON_ENABLED=false`, or
+- set `MAIL_DRY_RUN=true`, or
+- remove `grantos.local` from `MAIL_ALLOWED_DOMAINS` so those sends are refused, or
+- replace the seeded contacts with real addresses.
+
+### Running a local capture tool instead (optional)
+
+Nothing in the application requires one, but for development you can start one
+and point SMTP at it — no code change needed:
+
+```powershell
+docker run -d --name mailpit -p 8025:8025 -p 1025:1025 axllent/mailpit
+# then in backend/.env:  SMTP_HOST=localhost  SMTP_PORT=1025  SMTP_USER=  SMTP_PASS=
+```
+
+While SMTP points at a local capture tool the recipient allow-list is not
+applied, because nothing can leave the machine.
+
+### Triggering a notification run on demand
 
 ```powershell
 $t = (Invoke-RestMethod http://127.0.0.1:3001/api/auth/login -Method Post -ContentType 'application/json' `
       -Body '{"email":"admin@grantos.local","password":"DemoAdmin!2026"}').access_token
+# Add "dry_run": true to evaluate the rules without sending anything.
 Invoke-RestMethod http://127.0.0.1:3001/api/notifications/run -Method Post `
-  -Headers @{Authorization="Bearer $t"} -ContentType 'application/json' -Body '{}'
+  -Headers @{Authorization="Bearer $t"} -ContentType 'application/json' -Body '{"dry_run":true}'
 ```
 
-Run it twice: the second run reports `skipped` and sends nothing. Duplicate suppression is enforced by a
-database constraint, not by application logic, so concurrent runs cannot double-send.
+Run it twice without `dry_run`: the second run reports `skipped` and sends nothing. Duplicate suppression
+is enforced by a database constraint, not by application logic, so concurrent runs cannot double-send.
+
+**With a real provider configured, prefer `dry_run` for any ad-hoc testing** — a
+live run emails every matching record contact.
 
 The scheduled job runs daily at **03:30 UTC (09:00 Asia/Kolkata)** — the same time Base44 used.
 

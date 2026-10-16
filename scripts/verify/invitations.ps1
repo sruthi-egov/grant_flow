@@ -13,9 +13,13 @@ $app = 'http://localhost:5173'
 $api = "$app/api"
 $mail = 'http://localhost:8025'
 $pass = 0; $fail = 0
+$skip = 0
 function Check($name, $cond, $detail) {
   if ($cond) { Write-Host "  PASS  $name" -ForegroundColor Green; $script:pass++ }
   else { Write-Host "  FAIL  $name  -> $detail" -ForegroundColor Red; $script:fail++ }
+}
+function Skip($name, $why) {
+  Write-Host "  SKIP  $name  -> $why" -ForegroundColor Yellow; $script:skip++
 }
 # Invoke-RestMethod consumes the response stream before the error body can be
 # read, so error-body assertions go through HttpClient instead.
@@ -51,6 +55,30 @@ $stamp  = Get-Random -Maximum 999999
 $invitee = "invitee.$stamp@grantos.local"
 $newPass = 'InviteeDemo!2026'
 
+# How mail is configured decides whether the message body can be read back,
+# and whether running this script would put real email on the wire.
+$mailStatus = Invoke-RestMethod "$api/notifications/status" -Headers $ah
+$mailMode = $mailStatus.mode
+Write-Host "`nSMTP mode: $mailMode ($($mailStatus.host):$($mailStatus.port))" -ForegroundColor DarkGray
+
+if ($mailMode -eq 'real_delivery') {
+  Write-Host @"
+
+  WARNING: SMTP is configured for REAL DELIVERY.
+  This script creates invitations, and each one triggers a send attempt to a
+  <...>@grantos.local address - a domain that does not exist. Those attempts
+  waste provider quota and generate bounces.
+
+  Re-run with MAIL_DRY_RUN=true in backend/.env (restart the backend first) to
+  exercise the whole workflow without transmitting anything.
+
+"@ -ForegroundColor Yellow
+  if (-not $env:GRANTOS_ALLOW_REAL_SEND) {
+    Write-Host "  Refusing to run. Set GRANTOS_ALLOW_REAL_SEND=1 to override.`n" -ForegroundColor Red
+    exit 2
+  }
+}
+
 Write-Host "`n== 1. Authorisation on the invite endpoint ==" -ForegroundColor Cyan
 $denied = $false
 try { Invoke-RestMethod "$api/users/invite" -Method Post -Headers $uh -ContentType 'application/json' `
@@ -72,7 +100,13 @@ Check "invitation created" ([bool]$created.invitation.id) "no id"
 Check "status is pending" ($created.invitation.status -eq 'pending') "status=$($created.invitation.status)"
 Check "role recorded on the invitation" ($created.invitation.role -eq 'user') "role=$($created.invitation.role)"
 Check "permissions recorded on the invitation" (($created.invitation.allowed_modules -join ',') -eq 'Grants,MOUs') "got $($created.invitation.allowed_modules -join ',')"
-Check "email reported sent" ($created.email_status -eq 'sent') "status=$($created.email_status)"
+if ($mailMode -eq 'dry_run') {
+  # A dry run must report 'skipped', never 'sent'.
+  Check "dry run reported as skipped, not sent" ($created.email_status -eq 'skipped') "status=$($created.email_status)"
+  Check "dry run explains itself" ($created.email_error -match 'MAIL_DRY_RUN') "error=$($created.email_error)"
+} else {
+  Check "email reported sent" ($created.email_status -eq 'sent') "status=$($created.email_status)"
+}
 
 Write-Host "`n== 3. No account exists until acceptance ==" -ForegroundColor Cyan
 $users = Invoke-RestMethod "$api/users" -Headers $ah
@@ -85,20 +119,32 @@ catch { $cannotLogin = ($_.Exception.Response.StatusCode.value__ -eq 401) }
 Check "invitee cannot sign in before accepting" $cannotLogin "login succeeded"
 
 Write-Host "`n== 4. Email contains a working link, not a password ==" -ForegroundColor Cyan
-Start-Sleep -Seconds 1
-$mailAfter = (Invoke-RestMethod "$mail/api/v1/messages?limit=1").messages_count
-Check "email captured locally" ($mailAfter -gt $mailBefore) "before=$mailBefore after=$mailAfter"
+# The message body can only be read back when SMTP points at a local capture
+# tool. With a real provider the mail has left the building, so the content
+# assertions are covered by unit tests instead
+# (src/users/invitations.service.spec.ts: "emails a link and never a password").
+if ($mailMode -eq 'local_capture') {
+  Start-Sleep -Seconds 1
+  $mailAfter = (Invoke-RestMethod "$mail/api/v1/messages?limit=1").messages_count
+  Check "email captured locally" ($mailAfter -gt $mailBefore) "before=$mailBefore after=$mailAfter"
 
-# Mailpit returns To as a single object for one recipient and an array for
-# several, so normalise before comparing.
-$msg = (Invoke-RestMethod "$mail/api/v1/messages?limit=20").messages |
-  Where-Object { @($_.To | ForEach-Object { $_.Address }) -contains $invitee } | Select-Object -First 1
-Check "email addressed to the invitee" ([bool]$msg) "not found"
-$body = (Invoke-RestMethod "$mail/api/v1/message/$($msg.ID)").HTML
-Check "email contains an /invite/ link" ($body -match '/invite/([A-Za-z0-9_\-]{20,})') "no link"
-$emailToken = $Matches[1]
-Check "email does NOT contain a password" (-not ($body -match '(?i)temporary password')) "password leaked in email"
-Check "link states it is single use" ($body -match '(?i)only be used once') "no single-use notice"
+  # The capture API returns To as a single object for one recipient and an
+  # array for several, so normalise before comparing.
+  $msg = (Invoke-RestMethod "$mail/api/v1/messages?limit=20").messages |
+    Where-Object { @($_.To | ForEach-Object { $_.Address }) -contains $invitee } | Select-Object -First 1
+  Check "email addressed to the invitee" ([bool]$msg) "not found"
+  $body = (Invoke-RestMethod "$mail/api/v1/message/$($msg.ID)").HTML
+  Check "email contains an /invite/ link" ($body -match '/invite/([A-Za-z0-9_\-]{20,})') "no link"
+  $emailToken = $Matches[1]
+  Check "email does NOT contain a password" (-not ($body -match '(?i)temporary password')) "password leaked in email"
+  Check "link states it is single use" ($body -match '(?i)only be used once') "no single-use notice"
+} else {
+  Skip "email body assertions" "SMTP mode is '$mailMode'; message content is covered by unit tests"
+  # The API returns the same link outside production, so the rest of the
+  # workflow can still be exercised without reading a mailbox.
+  Check "API returned an acceptance link" ([bool]$created.accept_url) "no accept_url"
+  $emailToken = ($created.accept_url -split '/invite/')[-1]
+}
 
 Write-Host "`n== 5. Acceptance page can preview the invitation ==" -ForegroundColor Cyan
 $preview = Invoke-RestMethod "$api/invitations/$emailToken"
@@ -235,6 +281,7 @@ cmd /c "docker exec grantos-postgres psql -U grantos -d grantos -c ""DELETE FROM
 Check "test records removed" $true ""
 
 Write-Host "`n--------------------------------------"
-Write-Host "PASSED: $pass    FAILED: $fail" -ForegroundColor $(if($fail -eq 0){'Green'}else{'Red'})
+Write-Host "PASSED: $pass    FAILED: $fail    SKIPPED: $skip" -ForegroundColor $(if($fail -eq 0){'Green'}else{'Red'})
+if ($skip -gt 0) { Write-Host "(skips are environment-dependent, not failures)" -ForegroundColor DarkGray }
 Write-Host "--------------------------------------`n"
 if ($fail -gt 0) { exit 1 }

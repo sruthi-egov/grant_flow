@@ -167,7 +167,8 @@ reason the baseline commit was made first.
 
 | Item | Status | Why | How to resolve |
 |---|---|---|---|
-| **Live AI extraction** | ❌ **Blocked — the API key is still rejected** | Re-tested 2026-10-15 after a reported key change. `backend/.env` was still blank, so the backend used the inherited Windows variable — unchanged, and **ending in a `.`** (`...i4A.`), which is not part of an API key. OpenAI returns `401 Incorrect API key provided`. | Paste the key into `backend/.env` (it now wins over the inherited one) with **no trailing full stop**, restart, and run `scripts/verify/ai-extraction.ps1`. |
+| **Live AI extraction** | ✅ **Working (2026-10-16)** | A valid key is now in `backend/.env`. Minimal connectivity check returned `{"ok":true}` in 2.7 s; full extraction returned **6 deliverables and 6 milestones** with correct amounts, dates and source sections in 15.6 s on `gpt-4o-mini`. | — |
+| **Gmail SMTP** | ❌ **Blocked — `SMTP_USER` is still the placeholder** | `SMTP_USER` is literally `your-new-email@gmail.com`, copied from `.env.example` without substitution, so Gmail returns `535-5.7.8 Username and Password not accepted`. | Set `SMTP_USER` to the real Gmail address (see §10). |
 | **Browser UI verification** | ⚠️ Not done | The `chrome-devtools` MCP server failed to connect this session. | Manual steps in `LOCAL_DEMO_GUIDE.md` → "Five-minute walkthrough". |
 | **Base44 data import** | ❌ Not possible | The export contains **source code and schema only** — no database rows and no uploaded PDFs. | Requires a data export from Base44. See §7. |
 | `inviteUser`, `sendTestNotification`, DB reset, file cleanup | Implemented, not exercised | Destructive or needs a UI flow. | Exercise manually during the demo. |
@@ -361,6 +362,38 @@ exists with a **real relay**. Scoping corrected:
 
 Verified after the change: inviting `mailtest.demo@gmail.com` reports
 `email_status: sent` and the message appears in Mailpit.
+
+### Mailpit removed; Gmail SMTP wired in (2026-10-16)
+
+Mail now goes through a real provider configured in `backend/.env`. Mailpit is
+no longer part of the application or the stack.
+
+**Removed:** the `mailpit` service, its ports (8025/1025), its healthcheck, its
+`grantos-mailpit` volume declaration and the `backend` service's `depends_on`
+entry — all from `docker-compose.yml`. The backend's hardcoded
+`SMTP_HOST: mailpit` / `SMTP_PORT: 1025` are gone; the container now reads
+`backend/.env` through `env_file`, so **no secret appears in compose**. The
+existing `grantos-mailpit` Docker volume was deliberately **not deleted**.
+
+`MailerService.isLocalCapture` still recognises `localhost`/`mailpit`/`mailhog`
+hosts. That is not a dependency — it is how the service decides whether to
+apply the recipient allow-list and whether a self-signed certificate is
+acceptable, so running a capture tool again stays a pure configuration change.
+
+**Transport correctness.** `SMTP_SECURE=false` selects STARTTLS on port 587, so
+the transport now sets `requireTLS` (a server refusing the upgrade is rejected
+rather than sent to in clear text), validates certificates for any real relay,
+and requires TLS 1.2 or better. Previously `rejectUnauthorized` followed
+`NODE_ENV`, which disabled certificate validation in development — wrong for a
+real provider.
+
+**Gmail app passwords.** Google displays them as four groups of four
+("abcd efgh ijkl mnop"). Those spaces are presentation only and break AUTH if
+sent verbatim, so every whitespace character is now stripped from `SMTP_PASS`.
+
+**Honest reporting.** A dry run returns `skipped`, never `sent`; a refused
+recipient returns `skipped` with the reason; a transport failure returns
+`failed`. There is no fallback to a local sink.
 
 ### Still unverified
 

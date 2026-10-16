@@ -47,6 +47,8 @@ export interface AppConfig {
     fromName: string;
     fromAddress: string;
     allowedDomains: string[];
+    /** When true, messages are logged and never transmitted. */
+    dryRun: boolean;
   };
   notifications: {
     cronEnabled: boolean;
@@ -122,14 +124,24 @@ export default (): AppConfig => {
     },
 
     mail: {
-      host: process.env.SMTP_HOST ?? 'localhost',
+      host: (process.env.SMTP_HOST ?? 'localhost').trim(),
       port: int(process.env.SMTP_PORT, 1025),
+      // SMTP_SECURE=false means "connect in the clear, then upgrade with
+      // STARTTLS" — which is what port 587 expects. It does NOT mean unencrypted:
+      // MailerService sets requireTLS so the upgrade is mandatory.
       secure: bool(process.env.SMTP_SECURE, false),
-      user: process.env.SMTP_USER || undefined,
-      pass: process.env.SMTP_PASS || undefined,
-      fromName: process.env.MAIL_FROM_NAME ?? 'GrantOS Notifications',
-      fromAddress: process.env.MAIL_FROM_ADDRESS ?? 'notifications@grantos.local',
+      user: process.env.SMTP_USER?.trim() || undefined,
+      // Gmail displays app passwords in groups of four ("abcd efgh ijkl mnop").
+      // Those spaces are presentation only; sending them verbatim fails AUTH,
+      // so every whitespace character is stripped.
+      pass: process.env.SMTP_PASS?.replace(/\s+/g, '') || undefined,
+      fromName: (process.env.MAIL_FROM_NAME ?? 'GrantOS Notifications').trim(),
+      fromAddress: (process.env.MAIL_FROM_ADDRESS ?? 'notifications@grantos.local').trim(),
       allowedDomains: list(process.env.MAIL_ALLOWED_DOMAINS),
+      // Lets automated checks exercise the full email path without putting
+      // anything on the wire. A dry-run send is reported as 'skipped', never
+      // as 'sent'.
+      dryRun: bool(process.env.MAIL_DRY_RUN, false),
     },
 
     notifications: {

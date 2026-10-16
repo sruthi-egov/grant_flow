@@ -12,11 +12,15 @@ export interface SendResult {
 /**
  * SMTP delivery.
  *
- * For the local demo this points at Mailpit (docker-compose), which captures
- * every message and delivers nothing. `MAIL_ALLOWED_DOMAINS` is a hard
- * second line of defence: if the SMTP settings are ever pointed at a real
- * relay with demo data still loaded, mail to outside addresses is refused
- * rather than sent.
+ * Configured through SMTP_HOST / SMTP_PORT / SMTP_SECURE / SMTP_USER /
+ * SMTP_PASS. For a real provider such as Gmail that means
+ * smtp.gmail.com:587 with SMTP_SECURE=false, which selects STARTTLS rather
+ * than implicit TLS — the connection is still encrypted, and `requireTLS`
+ * below makes the upgrade mandatory rather than opportunistic.
+ *
+ * `MAIL_ALLOWED_DOMAINS` is a safety net for real delivery: mail to a domain
+ * outside the list is refused rather than sent. It is not applied when SMTP
+ * points at a local capture tool, where nothing can leave the machine.
  */
 @Injectable()
 export class MailerService implements OnModuleInit {
@@ -29,17 +33,55 @@ export class MailerService implements OnModuleInit {
 
   onModuleInit(): void {
     const mail = this.config.get<any>('mail');
+    const localCapture = this.isLocalCapture;
 
     this.transporter = nodemailer.createTransport({
       host: mail.host,
       port: mail.port,
+      // false on port 587 = plain connect then STARTTLS upgrade.
       secure: mail.secure,
+      // Refuse to continue if the server will not upgrade to TLS. Without this
+      // nodemailer would silently fall back to an unencrypted session and send
+      // the password in the clear.
+      requireTLS: !mail.secure && !localCapture,
       auth: mail.user ? { user: mail.user, pass: mail.pass } : undefined,
-      // Mailpit presents a self-signed certificate.
-      tls: { rejectUnauthorized: this.config.get<boolean>('isProduction') ?? false },
+      tls: {
+        // Certificates are validated for every real relay. The exception is a
+        // local capture tool, which presents a self-signed certificate.
+        rejectUnauthorized: !localCapture,
+        minVersion: 'TLSv1.2',
+      },
+      connectionTimeout: 15_000,
+      greetingTimeout: 10_000,
+      socketTimeout: 30_000,
     });
 
+    this.warnIfSenderMismatch();
     void this.verify();
+  }
+
+  /**
+   * Gmail will not send with an arbitrary From address: it must be the
+   * authenticated mailbox or a verified alias, otherwise it rewrites the
+   * header or rejects the message. Surfacing that here turns a confusing
+   * delivery failure into an explicit startup warning.
+   */
+  private warnIfSenderMismatch(): void {
+    const mail = this.config.get<any>('mail');
+    if (this.isLocalCapture || !mail.user) return;
+
+    const from = String(mail.fromAddress ?? '').toLowerCase();
+    const user = String(mail.user ?? '').toLowerCase();
+
+    if (from && user && from !== user) {
+      this.logger.warn(
+        `MAIL_FROM_ADDRESS (${from}) differs from SMTP_USER (${user}). ` +
+          'Most providers, Gmail included, only allow sending as the authenticated ' +
+          'mailbox or a verified alias — the From header will be rewritten or the ' +
+          'message rejected. Set MAIL_FROM_ADDRESS to the SMTP_USER address unless ' +
+          'you have configured an alias.',
+      );
+    }
   }
 
   /**
@@ -112,7 +154,12 @@ export class MailerService implements OnModuleInit {
       allowed_domains: mail.allowedDomains,
       last_error: this.lastVerifyError,
       // Makes it obvious on the Settings page whether mail leaves the machine.
-      mode: this.isLocalCapture ? 'local_capture' : 'real_delivery',
+      mode: mail.dryRun
+        ? 'dry_run'
+        : this.isLocalCapture
+          ? 'local_capture'
+          : 'real_delivery',
+      dry_run: mail.dryRun === true,
       app_public_url: appUrl,
       links_reachable_externally: !isLocalUrl,
       warning:
@@ -166,6 +213,16 @@ export class MailerService implements OnModuleInit {
     if (!gate.allowed) {
       this.logger.warn(`Refused to send to ${options.to}: ${gate.reason}`);
       return { status: 'skipped', error: gate.reason };
+    }
+
+    if (mail.dryRun) {
+      // Deliberately 'skipped', not 'sent' — nothing was transmitted, and
+      // callers must never report a dry run as a delivery.
+      this.logger.log(`[dry run] would send "${options.subject}" to ${options.to}`);
+      return {
+        status: 'skipped',
+        error: 'MAIL_DRY_RUN is enabled — the message was composed but not transmitted.',
+      };
     }
 
     try {

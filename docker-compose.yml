@@ -1,8 +1,16 @@
 # GrantOS — local stack.
 #
-#   docker compose up -d                  → Postgres + Mailpit only
+#   docker compose up -d                  → PostgreSQL only
 #                                           (run backend/frontend with npm; best for development)
 #   docker compose --profile app up -d    → the whole application in containers
+#
+# Email is delivered through the SMTP provider configured in backend/.env
+# (SMTP_HOST / SMTP_PORT / SMTP_SECURE / SMTP_USER / SMTP_PASS). No mail
+# container is part of this stack.
+#
+# If you want a local capture tool again for development, add one yourself and
+# point SMTP_HOST/SMTP_PORT at it — the application needs no code change:
+#   docker run -d --name mailpit -p 8025:8025 -p 1025:1025 axllent/mailpit
 #
 # Host ports are deliberately non-default so this stack never collides with a
 # PostgreSQL or dev server you already run. Data and uploads live in named
@@ -30,28 +38,6 @@ services:
       retries: 20
       start_period: 10s
 
-  # Local SMTP sink. Captures every outgoing email and shows it in a web UI.
-  # Nothing is ever delivered to a real recipient.
-  mailpit:
-    image: axllent/mailpit:latest
-    container_name: grantos-mailpit
-    restart: unless-stopped
-    environment:
-      MP_MAX_MESSAGES: 5000
-      MP_SMTP_AUTH_ACCEPT_ANY: 1
-      MP_SMTP_AUTH_ALLOW_INSECURE: 1
-    ports:
-      - "${MAILPIT_UI_PORT:-8025}:8025"   # web UI
-      - "${MAILPIT_SMTP_PORT:-1025}:1025" # SMTP
-    volumes:
-      - grantos-mailpit:/data
-    healthcheck:
-      test: ["CMD", "/mailpit", "readyz"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 5s
-
   backend:
     profiles: ["app"]
     build:
@@ -63,32 +49,19 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      mailpit:
-        condition: service_started
+    # Secrets (SMTP_PASS, OPENAI_API_KEY, JWT_*) are read from backend/.env and
+    # never appear in this file. `environment:` below overrides anything in that
+    # file, so only container-specific values are restated here.
+    env_file:
+      - path: ./backend/.env
+        required: false
     environment:
       NODE_ENV: production
       PORT: 3001
+      # Inside the network the database is reachable by service name, which the
+      # host-oriented value in backend/.env cannot express.
       DATABASE_URL: postgresql://${POSTGRES_USER:-grantos}:${POSTGRES_PASSWORD:-grantos_local_dev}@postgres:5432/${POSTGRES_DB:-grantos}?schema=public
-      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173}
-      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:-dev-only-access-secret-change-me-before-any-shared-deployment}
-      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-dev-only-refresh-secret-change-me-before-any-shared-deployment}
       UPLOAD_DIR: /app/storage/uploads
-      SMTP_HOST: mailpit
-      SMTP_PORT: 1025
-      SMTP_SECURE: "false"
-      MAIL_FROM_NAME: ${MAIL_FROM_NAME:-GrantOS Notifications}
-      MAIL_FROM_ADDRESS: ${MAIL_FROM_ADDRESS:-notifications@grantos.local}
-      MAIL_ALLOWED_DOMAINS: ${MAIL_ALLOWED_DOMAINS:-grantos.local,example.com,example.org}
-      APP_PUBLIC_URL: ${APP_PUBLIC_URL:-http://localhost:5173}
-      NOTIFICATIONS_CRON_ENABLED: ${NOTIFICATIONS_CRON_ENABLED:-true}
-      NOTIFICATIONS_CRON: ${NOTIFICATIONS_CRON:-30 3 * * *}
-      # Optional — extraction reports "not configured" when absent.
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
-      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
-      SEED_ADMIN_EMAIL: ${SEED_ADMIN_EMAIL:-admin@grantos.local}
-      SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-DemoAdmin!2026}
-      SEED_USER_EMAIL: ${SEED_USER_EMAIL:-analyst@grantos.local}
-      SEED_USER_PASSWORD: ${SEED_USER_PASSWORD:-DemoUser!2026}
     ports:
       - "${BACKEND_HOST_PORT:-3001}:3001"
     volumes:
@@ -125,5 +98,6 @@ volumes:
     name: grantos-pgdata
   grantos-uploads:
     name: grantos-uploads
-  grantos-mailpit:
-    name: grantos-mailpit
+  # The grantos-mailpit volume is intentionally no longer declared. It is left
+  # on disk rather than removed, so no captured history is destroyed; delete it
+  # manually with `docker volume rm grantos-mailpit` if you want the space.

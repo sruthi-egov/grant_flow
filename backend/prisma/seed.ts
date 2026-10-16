@@ -112,7 +112,10 @@ async function seedSettings(): Promise<void> {
       id: ID.settings,
       notifications_enabled: true,
       days_before: 7,
-      // Fictional addresses inside the demo domain; Mailpit captures them.
+      // Fictional addresses on a domain that does not resolve. They exist to
+      // demonstrate recipient rules, not to receive mail — see the warning in
+      // LOCAL_DEMO_GUIDE.md about enabling the notification cron while real
+      // SMTP is configured.
       alert_emails: ['programme.office@grantos.local', 'finance.team@grantos.local'],
       environment_name: 'staging',
       environment_label_enabled: true,

@@ -135,20 +135,39 @@ Check "status filter yields a count" ($activeCount -ge 1) "active=$activeCount"
 $expected = 0; foreach($g in $allGrants){ $expected += [double]$g.total_amount }
 Check "portfolio total matches row-by-row sum" ([math]::Abs($expected - $sumAll) -lt 0.01) "expected=$expected got=$sumAll"
 
-Write-Host "`n== H. Notifications through local capture ==" -ForegroundColor Cyan
-$mailBefore = (Invoke-RestMethod 'http://localhost:8025/api/v1/messages?limit=1').messages_count
-$run = Invoke-RestMethod "$api/notifications/run" -Method Post -Headers $ah -ContentType 'application/json' -Body '{}'
-Check "notification run completed" ($null -ne $run.date) "no date"
-Start-Sleep -Seconds 2
-$mailAfter = (Invoke-RestMethod 'http://localhost:8025/api/v1/messages?limit=1').messages_count
-Check "emails captured by Mailpit" ($mailAfter -gt $mailBefore) "before=$mailBefore after=$mailAfter sent=$($run.sent)"
+Write-Host "`n== H. Notification processing ==" -ForegroundColor Cyan
+# How mail is configured decides whether a real run would put email on the wire.
+$mailStatus = Invoke-RestMethod "$api/notifications/status" -Headers $ah
+$mailMode = $mailStatus.mode
+Write-Host "  SMTP mode: $mailMode ($($mailStatus.host):$($mailStatus.port))" -ForegroundColor DarkGray
 
-# Re-run must not duplicate
-$run2 = Invoke-RestMethod "$api/notifications/run" -Method Post -Headers $ah -ContentType 'application/json' -Body '{}'
-Start-Sleep -Seconds 2
-$mailAfter2 = (Invoke-RestMethod 'http://localhost:8025/api/v1/messages?limit=1').messages_count
-Check "re-run sends no duplicates" ($mailAfter2 -eq $mailAfter) "after=$mailAfter after2=$mailAfter2 sent2=$($run2.sent)"
-Check "re-run reports skipped items" ($run2.skipped -gt 0) "skipped=$($run2.skipped)"
+if ($mailMode -eq 'local_capture') {
+  # Safe to actually send: nothing can leave the machine.
+  $mailBefore = (Invoke-RestMethod 'http://localhost:8025/api/v1/messages?limit=1').messages_count
+  $run = Invoke-RestMethod "$api/notifications/run" -Method Post -Headers $ah -ContentType 'application/json' -Body '{}'
+  Check "notification run completed" ($null -ne $run.date) "no date"
+  Start-Sleep -Seconds 2
+  $mailAfter = (Invoke-RestMethod 'http://localhost:8025/api/v1/messages?limit=1').messages_count
+  Check "emails captured locally" ($mailAfter -gt $mailBefore) "before=$mailBefore after=$mailAfter sent=$($run.sent)"
+
+  $run2 = Invoke-RestMethod "$api/notifications/run" -Method Post -Headers $ah -ContentType 'application/json' -Body '{}'
+  Start-Sleep -Seconds 2
+  $mailAfter2 = (Invoke-RestMethod 'http://localhost:8025/api/v1/messages?limit=1').messages_count
+  Check "re-run sends no duplicates" ($mailAfter2 -eq $mailAfter) "after=$mailAfter after2=$mailAfter2 sent2=$($run2.sent)"
+  Check "re-run reports skipped items" ($run2.skipped -gt 0) "skipped=$($run2.skipped)"
+}
+else {
+  # Real provider or dry run: never trigger a live send from an automated
+  # check. dry_run exercises rule evaluation and recipient resolution without
+  # composing anything for transmission.
+  Write-Host "  (using dry_run so no email is transmitted)" -ForegroundColor DarkGray
+  $run = Invoke-RestMethod "$api/notifications/run" -Method Post -Headers $ah -ContentType 'application/json' -Body '{"dry_run":true}'
+  Check "notification run completed" ($null -ne $run.date) "no date"
+  Check "run reports it was a dry run" ($run.dry_run -eq $true) "dry_run=$($run.dry_run)"
+  Check "rules evaluated against real records" ($run.total_events -ge 0) "total_events missing"
+  Check "recipients resolved" ($null -ne $run.recipients) "recipients missing"
+  Write-Host "  SKIP  live delivery assertions -> SMTP mode is '$mailMode'" -ForegroundColor Yellow
+}
 
 $logs = Invoke-RestMethod "$api/entities/NotificationLog?sort=-created_date&limit=50" -Headers $ah
 Check "delivery history retained" ($logs.Count -gt 0) "count=$($logs.Count)"
