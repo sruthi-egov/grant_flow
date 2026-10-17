@@ -706,6 +706,76 @@ ${rendered.body}`;
     return { status: result.status, to, error: null };
   }
 
+  /**
+   * One plain-text diagnostic message, returning the full SMTP evidence.
+   *
+   * Plain text with no links deliberately: if this arrives but a rich
+   * invitation does not, the difference is content filtering rather than
+   * connectivity or addressing.
+   */
+  async sendDiagnosticEmail(to: string, initiatedBy: string, note?: string) {
+    const target = normalizeEmail(to);
+    if (!isValidEmail(target)) {
+      throw new BadRequestException(`"${to}" is not a valid email address`);
+    }
+
+    const sentAt = new Date();
+    const marker = `GRANTOS-DIAG-${sentAt.toISOString().replace(/[-:.TZ]/g, '').slice(0, 14)}-${Math.random()
+      .toString(36)
+      .slice(2, 8)
+      .toUpperCase()}`;
+
+    const text = [
+      'GrantOS delivery diagnostic.',
+      '',
+      `Reference: ${marker}`,
+      `Sent at:   ${sentAt.toISOString()} (UTC)`,
+      `Initiated by: ${initiatedBy}`,
+      note ? `Note: ${note}` : null,
+      '',
+      'This is a plain-text test with no links and no account data.',
+      'It exists only to establish whether mail from this system reaches you.',
+      'No action is required and nothing has changed in your account.',
+    ]
+      .filter((l) => l !== null)
+      .join('\n');
+
+    const result = await this.mailer.send({
+      to: target,
+      subject: `[GrantOS] Delivery diagnostic ${marker}`,
+      // A text/plain alternative plus minimal HTML; no links at all.
+      text,
+      html: `<pre style="font-family:monospace;font-size:13px">${text
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')}</pre>`,
+      purpose: 'transactional',
+    });
+
+    this.logger.log(`Diagnostic ${marker} to ${target}: ${result.status}`);
+
+    return {
+      marker,
+      subject: `[GrantOS] Delivery diagnostic ${marker}`,
+      sent_at_utc: sentAt.toISOString(),
+      sent_at_local: sentAt.toString(),
+      intended_recipient: target,
+      // 'sent' here means the provider accepted it, not that it was delivered.
+      smtp_outcome: result.status,
+      provider_accepted_intended_recipient:
+        result.status === 'sent' && (result.accepted ?? []).includes(target),
+      message_id: result.messageId ?? null,
+      accepted: result.accepted ?? [],
+      rejected: result.rejected ?? [],
+      smtp_response: result.response ?? null,
+      envelope: result.envelope ?? null,
+      error: result.error ?? null,
+      caveat:
+        'Acceptance by the provider is not confirmation of inbox delivery. ' +
+        'The message may still be filtered, deferred or bounced after this point.',
+    };
+  }
+
   /** Simple "is SMTP working" probe used by the Settings page. */
   async sendSimpleTestEmail(recipients: string[], initiatedBy: string) {
     const timezone = this.config.get<string>('notifications.timezone') ?? 'Asia/Kolkata';

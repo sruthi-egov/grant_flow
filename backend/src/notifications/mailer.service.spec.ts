@@ -45,8 +45,23 @@ function build(overrides: MailOverrides = {}, extra: Record<string, any> = {}) {
     ...overrides,
   };
 
-  // Typed parameter so the assertions below can read the sent message.
-  const sendMail = jest.fn(async (_message: any) => ({ messageId: '<test@local>' }));
+  // Mirrors what nodemailer actually resolves with: the recipient appears in
+  // `accepted`, and the final SMTP response line is included. The service
+  // checks `accepted` before reporting success, so a mock returning only a
+  // messageId would (correctly) be treated as a failed send.
+  const sendMail = jest.fn(async (message: any) => {
+    const recipients = String(message?.to ?? '')
+      .split(',')
+      .map((a: string) => a.trim())
+      .filter(Boolean);
+    return {
+      messageId: '<test@local>',
+      accepted: recipients,
+      rejected: [],
+      response: '250 2.0.0 OK  1761000000 test - gsmtp',
+      envelope: { from: message?.from, to: recipients },
+    };
+  });
   const verify = jest.fn(async () => true);
   createTransport.mockReturnValue({ sendMail, verify });
 
@@ -176,6 +191,83 @@ describe('sending', () => {
 
     expect(result.status).toBe('failed');
     expect(result.error).toContain('535');
+  });
+
+  it('captures the delivery evidence the provider returns', async () => {
+    const { service } = build();
+
+    const result = await service.send({ to: 'person@contoso.com', subject: 's', html: 'h' });
+
+    expect(result.status).toBe('sent');
+    expect(result.messageId).toBe('<test@local>');
+    expect(result.accepted).toEqual(['person@contoso.com']);
+    expect(result.rejected).toEqual([]);
+    expect(result.response).toMatch(/^250 /);
+    expect(result.envelope?.to).toEqual(['person@contoso.com']);
+    expect(result.attemptedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+  });
+
+  it('does NOT report success when the intended recipient was not accepted', async () => {
+    // sendMail resolves even when a recipient is refused, so a resolved
+    // promise alone must never be treated as proof of acceptance.
+    const { service, sendMail } = build();
+    sendMail.mockResolvedValueOnce({
+      messageId: '<partial@local>',
+      accepted: ['someone-else@contoso.com'],
+      rejected: ['intended@contoso.com'],
+      response: '250 2.0.0 OK',
+      envelope: { from: 'sender@gmail.com', to: ['someone-else@contoso.com'] },
+    } as any);
+
+    const result = await service.send({ to: 'intended@contoso.com', subject: 's', html: 'h' });
+
+    expect(result.status).toBe('failed');
+    expect(result.error).toMatch(/did not accept intended@contoso\.com/);
+    expect(result.rejected).toContain('intended@contoso.com');
+  });
+
+  it('matches the accepted recipient case-insensitively', async () => {
+    const { service, sendMail } = build();
+    sendMail.mockResolvedValueOnce({
+      messageId: '<x@local>',
+      accepted: ['Person@Contoso.COM'],
+      rejected: [],
+      response: '250 OK',
+      envelope: {},
+    } as any);
+
+    const result = await service.send({ to: 'person@contoso.com', subject: 's', html: 'h' });
+
+    expect(result.status).toBe('sent');
+  });
+
+  it('keeps the provider diagnostic code and response on a failure', async () => {
+    const { service, sendMail } = build();
+    const err: any = new Error('Message rejected');
+    err.responseCode = 550;
+    err.response = '550 5.7.1 Message blocked';
+    err.command = 'DATA';
+    sendMail.mockRejectedValueOnce(err);
+
+    const result = await service.send({ to: 'person@contoso.com', subject: 's', html: 'h' });
+
+    expect(result.status).toBe('failed');
+    expect(result.error).toContain('code=550');
+    expect(result.error).toContain('550 5.7.1 Message blocked');
+    expect(result.error).toContain('command=DATA');
+  });
+
+  it('passes a plain-text alternative through when supplied', async () => {
+    const { service, sendMail } = build();
+
+    await service.send({
+      to: 'person@contoso.com',
+      subject: 's',
+      html: '<p>h</p>',
+      text: 'plain body',
+    });
+
+    expect(sendMail.mock.calls[0][0].text).toBe('plain body');
   });
 
   it('does not transmit anything in dry-run mode', async () => {

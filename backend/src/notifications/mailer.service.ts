@@ -3,10 +3,30 @@ import { ConfigService } from '@nestjs/config';
 import * as nodemailer from 'nodemailer';
 import type { Transporter } from 'nodemailer';
 
+/**
+ * Outcome of a send attempt.
+ *
+ * `status: 'sent'` means the SMTP server **accepted the message for delivery**
+ * and listed the intended recipient in its accepted set. It does NOT mean the
+ * message reached an inbox — the provider may still filter, defer or bounce it
+ * afterwards, and no SMTP response can tell us otherwise. Anything that reports
+ * this to a human must say "submitted", not "delivered".
+ */
 export interface SendResult {
   status: 'sent' | 'failed' | 'skipped';
-  messageId?: string;
   error?: string;
+  /** Provider-assigned id, the handle for tracing the message in their logs. */
+  messageId?: string;
+  /** Recipients the server accepted. The intended address must appear here. */
+  accepted?: string[];
+  /** Recipients the server refused. */
+  rejected?: string[];
+  /** The final SMTP response line, e.g. "250 2.0.0 OK  1761... - gsmtp". */
+  response?: string;
+  /** The envelope actually transmitted, which can differ from the headers. */
+  envelope?: { from?: string; to?: string[] };
+  /** When the attempt completed, ISO-8601 with offset. */
+  attemptedAt?: string;
 }
 
 /**
@@ -267,6 +287,8 @@ export class MailerService implements OnModuleInit {
     to: string;
     subject: string;
     html: string;
+    /** Optional plain-text alternative; used by diagnostic sends. */
+    text?: string;
     fromName?: string;
     /** Defaults to transactional; the scheduled run passes 'notification'. */
     purpose?: MailPurpose;
@@ -289,18 +311,71 @@ export class MailerService implements OnModuleInit {
       };
     }
 
+    const target = options.to.trim().toLowerCase();
+
     try {
-      const info = await this.transporter.sendMail({
+      const info: any = await this.transporter.sendMail({
         from: `"${options.fromName ?? mail.fromName}" <${mail.fromAddress}>`,
         to: options.to,
         subject: options.subject,
         html: options.html,
+        ...(options.text ? { text: options.text } : {}),
       });
-      return { status: 'sent', messageId: info.messageId };
+
+      const accepted: string[] = (info.accepted ?? []).map((a: any) =>
+        String(typeof a === 'string' ? a : (a?.address ?? a)).toLowerCase(),
+      );
+      const rejected: string[] = (info.rejected ?? []).map((a: any) =>
+        String(typeof a === 'string' ? a : (a?.address ?? a)).toLowerCase(),
+      );
+
+      const evidence = {
+        messageId: info.messageId,
+        accepted,
+        rejected,
+        response: info.response,
+        envelope: info.envelope,
+        attemptedAt: new Date().toISOString(),
+      };
+
+      // sendMail resolves even when some recipients were refused, so a
+      // resolved promise is NOT on its own proof that *this* address was
+      // accepted. Check explicitly before reporting success.
+      if (!accepted.includes(target)) {
+        const reason =
+          `The SMTP server did not accept ${options.to}. ` +
+          `Accepted: [${accepted.join(', ') || 'none'}]. Rejected: [${rejected.join(', ') || 'none'}]. ` +
+          `Server response: ${info.response ?? 'none'}`;
+        this.logger.error(reason);
+        return { status: 'failed', error: reason, ...evidence };
+      }
+
+      this.logger.log(
+        `Submitted to provider: to=${options.to} messageId=${info.messageId} ` +
+          `accepted=[${accepted.join(', ')}] rejected=[${rejected.join(', ') || 'none'}] ` +
+          `response="${info.response ?? ''}" at=${evidence.attemptedAt}`,
+      );
+
+      return { status: 'sent', ...evidence };
     } catch (error: any) {
       const message = error?.message ?? String(error);
-      this.logger.error(`Failed to send to ${options.to}: ${message}`);
-      return { status: 'failed', error: message };
+      // Provider diagnostics live on these fields and are worth keeping.
+      const detail = [
+        error?.responseCode ? `code=${error.responseCode}` : null,
+        error?.response ? `response="${error.response}"` : null,
+        error?.command ? `command=${error.command}` : null,
+      ]
+        .filter(Boolean)
+        .join(' ');
+
+      this.logger.error(
+        `Failed to send to ${options.to}: ${message}${detail ? ` (${detail})` : ''}`,
+      );
+      return {
+        status: 'failed',
+        error: `${message}${detail ? ` (${detail})` : ''}`,
+        attemptedAt: new Date().toISOString(),
+      };
     }
   }
 }

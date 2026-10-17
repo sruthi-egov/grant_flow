@@ -132,10 +132,16 @@ export default function UserAdmin() {
       });
 
       if (result?.email_status === "sent") {
+        // "Submitted", not "sent": the provider accepted the message, which is
+        // not the same as it reaching an inbox. It may still be filtered.
         toast.success(
           result.resent
-            ? `New invitation link sent to ${email}. The previous link no longer works.`
-            : `Invitation sent to ${email}.`,
+            ? `Invitation for ${email} submitted to the email provider. The previous link no longer works.`
+            : `Invitation for ${email} submitted to the email provider.`,
+          {
+            description: "Inbox delivery is not confirmed — ask the recipient to check spam if it does not arrive.",
+            duration: 10000,
+          },
         );
       } else {
         // The invitation exists; only delivery failed. Say so, with the
@@ -177,7 +183,13 @@ export default function UserAdmin() {
     try {
       const result = await api.invitations.resend(invitation.id);
       if (result?.email_status === "sent") {
-        toast.success(`New invitation link sent to ${invitation.email}. The previous link no longer works.`);
+        toast.success(
+          `New invitation link for ${invitation.email} submitted to the email provider. The previous link no longer works.`,
+          {
+            description: "Inbox delivery is not confirmed — ask the recipient to check spam if it does not arrive.",
+            duration: 10000,
+          },
+        );
       } else {
         toast.warning(
           result?.email_error

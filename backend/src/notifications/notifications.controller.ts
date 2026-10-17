@@ -53,6 +53,24 @@ export class NotificationsController {
     return this.notifications.sendAdHocEmail(body ?? ({} as any), user.email);
   }
 
+  /**
+   * Sends one plain-text diagnostic message and returns the complete SMTP
+   * evidence: messageId, accepted/rejected recipients, the final server
+   * response and the envelope actually transmitted.
+   *
+   * Intended for investigating "the recipient says it never arrived". The body
+   * carries no links and no sensitive data, so it isolates deliverability from
+   * content filtering.
+   */
+  @Post('diagnostic')
+  @HttpCode(200)
+  diagnostic(
+    @Body() body: { to: string; note?: string },
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.notifications.sendDiagnosticEmail(body?.to, user.email, body?.note);
+  }
+
   /** Plain "does SMTP work" check for the Settings page. */
   @Post('test-simple')
   @HttpCode(200)
