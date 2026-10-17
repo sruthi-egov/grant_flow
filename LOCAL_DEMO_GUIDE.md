@@ -139,7 +139,9 @@ There is no mail container in `docker-compose.yml` any more.
 | `SMTP_PASS` | the 16-character **App Password** (2-Step Verification required; a normal password is rejected). Google's display spaces are stripped automatically. |
 | `MAIL_FROM_NAME` | display name on the From header |
 | `MAIL_FROM_ADDRESS` | **must equal `SMTP_USER`** unless you have a verified alias — Gmail rewrites or rejects anything else. The backend warns at startup if they differ. |
-| `MAIL_ALLOWED_DOMAINS` | recipient allow-list, enforced for real delivery |
+| `MAIL_RECIPIENT_POLICY` | `unrestricted` (any valid address, any provider — the normal setting) or `allowlist` (only `MAIL_ALLOWED_DOMAINS`). An empty value, `*`, `all` or `none` are **not** accepted as shorthand; the backend refuses to start rather than guess. |
+| `MAIL_ALLOWED_DOMAINS` | consulted **only** under `allowlist` |
+| `NOTIFICATION_BLOCKED_DOMAINS` | domains the **automated** notification run never emails, whatever the policy. Protects the seeded demo contacts. Invitations and admin sends to the same address still work. |
 | `MAIL_DRY_RUN` | compose but never transmit. A dry run reports `skipped`, never `sent`. |
 
 Check the live state at any time:
@@ -153,19 +155,23 @@ Invoke-RestMethod http://localhost:5173/api/notifications/status -Headers @{Auth
 `mode` is `real_delivery`, `local_capture` or `dry_run`, and `reachable` reports
 whether SMTP authentication actually succeeded.
 
-### ⚠️ The notification cron will email the demo contacts
+### Who can be emailed
 
-`NOTIFICATIONS_CRON_ENABLED=true` runs the daily pass at 03:30 UTC. The seeded
-demo records contain fictional `@grantos.local` contacts on a domain that does
-not resolve. With real SMTP configured, each run attempts delivery to those
-addresses and every one bounces, which harms the sending account's reputation.
+**Invitations, password resets and admin-initiated sends** go to any valid
+address under the default `unrestricted` policy — Gmail, Outlook, company
+domains, anything that parses as an email address.
 
-Before leaving a real provider configured overnight, do one of:
+**Automated notification runs** additionally refuse
+`NOTIFICATION_BLOCKED_DOMAINS`. Every seeded demo contact sits on
+`grantos.local`, so the scheduled digest cannot email them even if the cron is
+switched back on — and no contact record had to be edited to achieve that.
 
-- set `NOTIFICATIONS_CRON_ENABLED=false`, or
-- set `MAIL_DRY_RUN=true`, or
-- remove `grantos.local` from `MAIL_ALLOWED_DOMAINS` so those sends are refused, or
-- replace the seeded contacts with real addresses.
+The two rules are independent on purpose: you can invite a colleague at
+`example.com` while the cron continues to leave that same address alone.
+
+`NOTIFICATIONS_CRON_ENABLED` is currently **`false`**, so the scheduled pass
+does not run at all. If you re-enable it, the blocked-domain list is what stops
+the demo contacts generating bounces.
 
 ### Running a local capture tool instead (optional)
 

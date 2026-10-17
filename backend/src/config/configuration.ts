@@ -46,7 +46,25 @@ export interface AppConfig {
     pass?: string;
     fromName: string;
     fromAddress: string;
+    /**
+     * Who may be emailed by ordinary application mail (invitations, password
+     * resets, admin-initiated sends).
+     *
+     *   'unrestricted' — any syntactically valid address, any provider.
+     *   'allowlist'    — only domains listed in MAIL_ALLOWED_DOMAINS.
+     *
+     * Set explicitly. An empty value or "*" is NOT interpreted as unrestricted.
+     */
+    recipientPolicy: 'unrestricted' | 'allowlist';
+    /** Consulted only when recipientPolicy is 'allowlist'. */
     allowedDomains: string[];
+    /**
+     * Domains that AUTOMATED notification runs must never email, whatever the
+     * recipient policy says. The seeded demo contacts live on these, so a
+     * scheduled digest cannot reach them. Invitations and admin-initiated
+     * sends are not affected.
+     */
+    notificationBlockedDomains: string[];
     /** When true, messages are logged and never transmitted. */
     dryRun: boolean;
   };
@@ -98,6 +116,46 @@ export function describeSuspectApiKey(raw: string | undefined): string | null {
   return null;
 }
 
+/**
+ * Domains that never receive automated notifications unless the operator
+ * overrides NOTIFICATION_BLOCKED_DOMAINS. These carry the seeded demo
+ * contacts, which do not resolve — emailing them generates bounces that harm
+ * the sending account's reputation.
+ */
+export const DEFAULT_NOTIFICATION_BLOCKED_DOMAINS = [
+  'grantos.local',
+  'example.com',
+  'example.org',
+  'example.net',
+  'test',
+  'invalid',
+  'localhost',
+];
+
+export class InvalidRecipientPolicyError extends Error {}
+
+/**
+ * Parses MAIL_RECIPIENT_POLICY.
+ *
+ * Only the two documented values are accepted. An unset value defaults to
+ * 'unrestricted' — the behaviour an application that emails real users needs —
+ * while demo addresses stay protected by the separate notification deny-list.
+ *
+ * A misspelling throws rather than silently falling back, because quietly
+ * choosing either option would be wrong: 'unrestricted' could email strangers,
+ * 'allowlist' could block every genuine recipient.
+ */
+export function recipientPolicy(raw: string | undefined): 'unrestricted' | 'allowlist' {
+  const value = (raw ?? '').trim().toLowerCase();
+  if (value === '') return 'unrestricted';
+  if (value === 'unrestricted' || value === 'allowlist') return value;
+
+  throw new InvalidRecipientPolicyError(
+    `MAIL_RECIPIENT_POLICY must be "unrestricted" or "allowlist" (got "${raw}"). ` +
+      'An empty value, "*", "all" or "none" are not accepted — state the policy explicitly.',
+  );
+}
+
 export default (): AppConfig => {
   const nodeEnv = process.env.NODE_ENV ?? 'development';
   const apiKey = (process.env.OPENAI_API_KEY ?? '').trim();
@@ -137,7 +195,11 @@ export default (): AppConfig => {
       pass: process.env.SMTP_PASS?.replace(/\s+/g, '') || undefined,
       fromName: (process.env.MAIL_FROM_NAME ?? 'GrantOS Notifications').trim(),
       fromAddress: (process.env.MAIL_FROM_ADDRESS ?? 'notifications@grantos.local').trim(),
+      recipientPolicy: recipientPolicy(process.env.MAIL_RECIPIENT_POLICY),
       allowedDomains: list(process.env.MAIL_ALLOWED_DOMAINS),
+      notificationBlockedDomains: process.env.NOTIFICATION_BLOCKED_DOMAINS
+        ? list(process.env.NOTIFICATION_BLOCKED_DOMAINS)
+        : DEFAULT_NOTIFICATION_BLOCKED_DOMAINS,
       // Lets automated checks exercise the full email path without putting
       // anything on the wire. A dry-run send is reported as 'skipped', never
       // as 'sent'.

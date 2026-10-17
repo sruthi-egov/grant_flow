@@ -455,7 +455,14 @@ export class NotificationsService {
           continue;
         }
 
-        const result = await this.mailer.send({ to: email, subject, html: body });
+        // The scheduled digest is the one automated bulk path, so it is the
+        // one subject to NOTIFICATION_BLOCKED_DOMAINS.
+        const result = await this.mailer.send({
+          to: email,
+          subject,
+          html: body,
+          purpose: 'notification',
+        });
 
         if (result.status === 'sent') sent += 1;
         else if (result.status === 'failed') failed += 1;

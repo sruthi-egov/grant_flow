@@ -23,7 +23,9 @@ interface MailOverrides {
   pass?: string;
   fromName?: string;
   fromAddress?: string;
+  recipientPolicy?: 'unrestricted' | 'allowlist';
   allowedDomains?: string[];
+  notificationBlockedDomains?: string[];
   dryRun?: boolean;
 }
 
@@ -36,7 +38,9 @@ function build(overrides: MailOverrides = {}, extra: Record<string, any> = {}) {
     pass: 'abcdefghijklmnop',
     fromName: 'GrantOS Notifications',
     fromAddress: 'sender@gmail.com',
+    recipientPolicy: 'unrestricted' as 'unrestricted' | 'allowlist',
     allowedDomains: ['grantos.local'],
+    notificationBlockedDomains: ['grantos.local', 'example.com', 'example.org'],
     dryRun: false,
     ...overrides,
   };
@@ -186,10 +190,13 @@ describe('sending', () => {
     expect(result.error).toMatch(/not transmitted/i);
   });
 
-  it('refuses a recipient outside the allow-list for real delivery', async () => {
-    const { service, sendMail } = build({ allowedDomains: ['grantos.local'] });
+  it('refuses a recipient outside the allow-list when that policy is selected', async () => {
+    const { service, sendMail } = build({
+      recipientPolicy: 'allowlist',
+      allowedDomains: ['grantos.local'],
+    });
 
-    const result = await service.send({ to: 'stranger@example.net', subject: 's', html: 'h' });
+    const result = await service.send({ to: 'stranger@contoso.co.uk', subject: 's', html: 'h' });
 
     expect(sendMail).not.toHaveBeenCalled();
     expect(result.status).toBe('skipped');
@@ -210,11 +217,14 @@ describe('sending', () => {
     expect(result.status).toBe('sent');
   });
 
-  it('allows any recipient when the allow-list is empty', async () => {
-    const { service, sendMail } = build({ allowedDomains: [] });
-    const result = await service.send({ to: 'anyone@example.net', subject: 's', html: 'h' });
-    expect(sendMail).toHaveBeenCalled();
-    expect(result.status).toBe('sent');
+  it('does NOT treat an empty allow-list as unrestricted', async () => {
+    // An empty list under the allowlist policy means "nobody", not "everybody".
+    const { service, sendMail } = build({ recipientPolicy: 'allowlist', allowedDomains: [] });
+
+    const result = await service.send({ to: 'anyone@contoso.co.uk', subject: 's', html: 'h' });
+
+    expect(sendMail).not.toHaveBeenCalled();
+    expect(result.status).toBe('skipped');
   });
 
   it('always allows the configured sender, so a self-test needs no allow-list change', async () => {
@@ -243,8 +253,148 @@ describe('sending', () => {
     expect(result.status).toBe('sent');
   });
 
-  it('still refuses a different address on the sender domain', async () => {
+  describe('unrestricted policy accepts real-world providers', () => {
+    it.each([
+      ['Gmail', 'someone@gmail.com'],
+      ['Gmail with a plus tag', 'someone+grants@gmail.com'],
+      ['Googlemail', 'someone@googlemail.com'],
+      ['Outlook', 'someone@outlook.com'],
+      ['Hotmail', 'someone@hotmail.co.uk'],
+      ['Microsoft 365 company domain', 'first.last@contoso.com'],
+      ['company subdomain', 'ops@mail.contoso.co.uk'],
+      ['Indian company domain', 'sruthi@egov.org.in'],
+      ['long multi-label domain', 'a@a.b.c.example-corp.org'],
+      ['hyphenated domain', 'info@my-company.io'],
+      ['numeric domain label', 'user@123corp.com'],
+    ])('accepts %s', async (_label, address) => {
+      const { service, sendMail } = build({ recipientPolicy: 'unrestricted' });
+
+      const result = await service.send({ to: address, subject: 's', html: 'h' });
+
+      expect(result.status).toBe('sent');
+      expect(sendMail).toHaveBeenCalledTimes(1);
+      expect(sendMail.mock.calls[0][0].to).toBe(address);
+    });
+
+    it('accepts a demo-domain address for a transactional send', async () => {
+      // Blocking demo domains is a notification-only rule; a human inviting
+      // someone at example.com must still work.
+      const { service, sendMail } = build({ recipientPolicy: 'unrestricted' });
+
+      const result = await service.send({ to: 'person@example.com', subject: 's', html: 'h' });
+
+      expect(result.status).toBe('sent');
+      expect(sendMail).toHaveBeenCalled();
+    });
+  });
+
+  describe('invalid addresses are rejected under every policy', () => {
+    it.each([
+      ['no at-sign', 'not-an-email'],
+      ['no domain', 'user@'],
+      ['no local part', '@example.com'],
+      ['no TLD', 'user@localhost-only'],
+      ['embedded space', 'user name@gmail.com'],
+      ['empty', ''],
+    ])('rejects %s', async (_label, address) => {
+      const { service, sendMail } = build({ recipientPolicy: 'unrestricted' });
+
+      const result = await service.send({ to: address, subject: 's', html: 'h' });
+
+      expect(sendMail).not.toHaveBeenCalled();
+      expect(result.status).toBe('skipped');
+      expect(result.error).toMatch(/not a valid email address/i);
+    });
+  });
+
+  describe('automated notifications never reach demo domains', () => {
+    it.each([
+      ['grantos.local', 'anita.raghavan@grantos.local'],
+      ['example.com', 'finance@example.com'],
+      ['example.org', 'team@example.org'],
+    ])('refuses a notification to %s', async (_label, address) => {
+      const { service, sendMail } = build({ recipientPolicy: 'unrestricted' });
+
+      const result = await service.send({
+        to: address,
+        subject: 's',
+        html: 'h',
+        purpose: 'notification',
+      });
+
+      expect(sendMail).not.toHaveBeenCalled();
+      expect(result.status).toBe('skipped');
+      expect(result.error).toMatch(/NOTIFICATION_BLOCKED_DOMAINS/);
+    });
+
+    it('still delivers notifications to a genuine recipient', async () => {
+      const { service, sendMail } = build({ recipientPolicy: 'unrestricted' });
+
+      const result = await service.send({
+        to: 'real.person@contoso.com',
+        subject: 's',
+        html: 'h',
+        purpose: 'notification',
+      });
+
+      expect(result.status).toBe('sent');
+      expect(sendMail).toHaveBeenCalled();
+    });
+
+    it('blocks demo domains even under local capture, so a dry run matches the real run', async () => {
+      const { service, sendMail } = build({
+        host: 'localhost',
+        port: 1025,
+        user: undefined,
+      });
+
+      const result = await service.send({
+        to: 'anita.raghavan@grantos.local',
+        subject: 's',
+        html: 'h',
+        purpose: 'notification',
+      });
+
+      expect(sendMail).not.toHaveBeenCalled();
+      expect(result.status).toBe('skipped');
+    });
+
+    it('treats the blocked list case-insensitively', async () => {
+      const { service, sendMail } = build();
+      const result = await service.send({
+        to: 'Someone@GrantOS.LOCAL',
+        subject: 's',
+        html: 'h',
+        purpose: 'notification',
+      });
+      expect(sendMail).not.toHaveBeenCalled();
+      expect(result.status).toBe('skipped');
+    });
+
+    it('does not block a domain that merely ends with a blocked one', async () => {
+      // "notexample.com" must not match "example.com".
+      const { service, sendMail } = build();
+      const result = await service.send({
+        to: 'person@notexample.com',
+        subject: 's',
+        html: 'h',
+        purpose: 'notification',
+      });
+      expect(result.status).toBe('sent');
+      expect(sendMail).toHaveBeenCalled();
+    });
+
+    it('defaults to transactional when no purpose is given', async () => {
+      const { service, sendMail } = build();
+      const result = await service.send({ to: 'person@example.com', subject: 's', html: 'h' });
+      expect(result.status).toBe('sent');
+      expect(sendMail).toHaveBeenCalled();
+    });
+  });
+
+  it('still refuses a different address on the sender domain under allowlist', async () => {
     const { service, sendMail } = build({
+      recipientPolicy: 'allowlist',
       user: 'sender@gmail.com',
       fromAddress: 'sender@gmail.com',
       allowedDomains: ['grantos.local'],

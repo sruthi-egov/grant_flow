@@ -5,7 +5,12 @@
  * from a string, a Gmail app password copied with its display spaces, and an
  * API key carrying stray punctuation.
  */
-import configuration, { describeSuspectApiKey } from './configuration';
+import configuration, {
+  DEFAULT_NOTIFICATION_BLOCKED_DOMAINS,
+  InvalidRecipientPolicyError,
+  describeSuspectApiKey,
+  recipientPolicy,
+} from './configuration';
 
 const ORIGINAL = { ...process.env };
 
@@ -86,6 +91,57 @@ describe('SMTP host, port and sender', () => {
   it('falls back to a non-routable default rather than an arbitrary address', () => {
     const c = load({ MAIL_FROM_ADDRESS: undefined });
     expect(c.mail.fromAddress).toBe('notifications@grantos.local');
+  });
+});
+
+describe('MAIL_RECIPIENT_POLICY', () => {
+  it.each([
+    ['unrestricted', 'unrestricted'],
+    ['UNRESTRICTED', 'unrestricted'],
+    ['  allowlist  ', 'allowlist'],
+    ['AllowList', 'allowlist'],
+  ])('accepts %s', (input, expected) => {
+    expect(recipientPolicy(input)).toBe(expected);
+  });
+
+  it('defaults to unrestricted when unset, so a normal install can email real users', () => {
+    expect(recipientPolicy(undefined)).toBe('unrestricted');
+    expect(recipientPolicy('')).toBe('unrestricted');
+  });
+
+  it.each([['*'], ['all'], ['none'], ['any'], ['true'], ['open'], ['restricted']])(
+    'refuses the ambiguous value %s rather than guessing',
+    (value) => {
+      expect(() => recipientPolicy(value)).toThrow(InvalidRecipientPolicyError);
+    },
+  );
+
+  it('names both valid values in the error', () => {
+    expect(() => recipientPolicy('*')).toThrow(/unrestricted.*allowlist/s);
+  });
+
+  it('surfaces the policy through the config object', () => {
+    expect(load({ MAIL_RECIPIENT_POLICY: 'allowlist' }).mail.recipientPolicy).toBe('allowlist');
+    expect(load({ MAIL_RECIPIENT_POLICY: 'unrestricted' }).mail.recipientPolicy).toBe('unrestricted');
+  });
+});
+
+describe('NOTIFICATION_BLOCKED_DOMAINS', () => {
+  it('defaults to the demo domains when unset', () => {
+    const c = load({ NOTIFICATION_BLOCKED_DOMAINS: undefined });
+    expect(c.mail.notificationBlockedDomains).toEqual(DEFAULT_NOTIFICATION_BLOCKED_DOMAINS);
+    expect(c.mail.notificationBlockedDomains).toEqual(
+      expect.arrayContaining(['grantos.local', 'example.com', 'example.org']),
+    );
+  });
+
+  it('can be replaced with a custom list', () => {
+    const c = load({ NOTIFICATION_BLOCKED_DOMAINS: 'staging.local, sandbox.test' });
+    expect(c.mail.notificationBlockedDomains).toEqual(['staging.local', 'sandbox.test']);
+  });
+
+  it('can be emptied deliberately with whitespace', () => {
+    expect(load({ NOTIFICATION_BLOCKED_DOMAINS: ' ' }).mail.notificationBlockedDomains).toEqual([]);
   });
 });
 

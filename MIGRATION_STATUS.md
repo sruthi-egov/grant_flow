@@ -429,6 +429,45 @@ under real delivery unless `GRANTOS_ALLOW_REAL_SEND=1` is set, because each
 invitation it creates would attempt delivery to a non-existent
 `@grantos.local` domain and generate bounces.
 
+### Recipient policy split from demo protection (2026-10-17)
+
+Inviting a Gmail address failed because a single `MAIL_ALLOWED_DOMAINS`
+allow-list governed **all** mail. Adding `gmail.com` and `outlook.com` to that
+list would have been whack-a-mole, so the two distinct concerns were separated.
+
+| Setting | Applies to | Values |
+|---|---|---|
+| `MAIL_RECIPIENT_POLICY` | invitations, password resets, admin-initiated sends | `unrestricted` (default) or `allowlist` — nothing else |
+| `MAIL_ALLOWED_DOMAINS` | consulted only under `allowlist` | comma-separated domains |
+| `NOTIFICATION_BLOCKED_DOMAINS` | the automated notification run only | comma-separated domains; defaults to the demo domains |
+
+`MAIL_RECIPIENT_POLICY` rejects `""`, `*`, `all`, `none` and any other value at
+startup rather than guessing — choosing wrongly would either email strangers or
+block every genuine recipient.
+
+`MailerService.send` now takes a `purpose` of `transactional` (default) or
+`notification`. Only `processNotifications` — the scheduled bulk path — passes
+`notification`, so the demo-domain block applies there and nowhere else. All 14
+seeded record contacts and the global alert list sit on `grantos.local`, so the
+scheduled digest cannot reach any of them, **without a single contact record
+being edited**.
+
+Check order in `isAllowedRecipient`: syntax → notification block → local
+capture → sender self-send → policy. The notification block deliberately
+precedes the local-capture exemption, so a capture tool cannot make the
+protection silently vanish.
+
+Email-address validation, authentication, role checks and the throttler are
+unchanged.
+
+**Verified with mocks** (`mailer.service.spec.ts`, `configuration.spec.ts`):
+Gmail, plus-tagged Gmail, Googlemail, Outlook, Hotmail, Microsoft 365 company
+domains, company subdomains, `egov.org.in`, hyphenated and numeric-label
+domains are all accepted; six malformed address shapes are rejected; demo
+domains are refused for notifications but accepted for invitations;
+`notexample.com` is correctly not matched by `example.com`; an empty allow-list
+under `allowlist` means nobody, not everybody. **201 unit tests passing.**
+
 ### Still unverified
 
 **Browser verification was not possible** — the `chrome-devtools` MCP server

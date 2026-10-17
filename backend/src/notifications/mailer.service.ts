@@ -10,6 +10,24 @@ export interface SendResult {
 }
 
 /**
+ * Why a message is being sent.
+ *
+ *   'transactional' — a person asked for it: an invitation, a password reset,
+ *                     an admin-initiated or test send. Goes to any valid
+ *                     recipient under the 'unrestricted' policy.
+ *   'notification'  — produced automatically by the scheduled run. Subject to
+ *                     NOTIFICATION_BLOCKED_DOMAINS, so seeded demo contacts
+ *                     are never emailed in bulk.
+ */
+export type MailPurpose = 'transactional' | 'notification';
+
+/** RFC 5322-simplified check, the same rule the notification engine uses. */
+function isSyntacticallyValid(email: string): boolean {
+  const value = (email ?? '').trim();
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value) && value.length <= 254;
+}
+
+/**
  * SMTP delivery.
  *
  * Configured through SMTP_HOST / SMTP_PORT / SMTP_SECURE / SMTP_USER /
@@ -151,7 +169,10 @@ export class MailerService implements OnModuleInit {
       host: mail.host,
       port: mail.port,
       from: `${mail.fromName} <${mail.fromAddress}>`,
-      allowed_domains: mail.allowedDomains,
+      recipient_policy: mail.recipientPolicy,
+      // Only meaningful under the 'allowlist' policy.
+      allowed_domains: mail.recipientPolicy === 'allowlist' ? mail.allowedDomains : null,
+      notification_blocked_domains: mail.notificationBlockedDomains,
       last_error: this.lastVerifyError,
       // Makes it obvious on the Settings page whether mail leaves the machine.
       mode: mail.dryRun
@@ -172,44 +193,73 @@ export class MailerService implements OnModuleInit {
   /**
    * Decides whether a recipient may be sent to.
    *
-   * MAIL_ALLOWED_DOMAINS exists to stop demo data from emailing real people by
-   * accident. That risk only exists with a real relay — when SMTP points at a
-   * local capture tool, every message is trapped on this machine and nothing
-   * can reach anyone, so the restriction is skipped.
+   * Order of checks, strictest first:
    *
-   * Enforcing it in local capture caused real confusion: invitations to
-   * ordinary addresses were silently dropped and never appeared in Mailpit,
-   * which looked like Mailpit being broken.
+   *  1. Syntax. A malformed address is rejected before anything else.
+   *  2. Automated notifications never reach NOTIFICATION_BLOCKED_DOMAINS.
+   *     This is what keeps the scheduled run away from the seeded demo
+   *     contacts, without altering a single contact record.
+   *  3. Local capture allows everything, because nothing can leave the
+   *     machine.
+   *  4. The configured sender is always permitted, so a self-addressed
+   *     connectivity test needs no configuration change.
+   *  5. The recipient policy decides the rest: 'unrestricted' accepts any
+   *     valid address, 'allowlist' accepts only MAIL_ALLOWED_DOMAINS.
+   *
+   * Note that 2 is checked before 3: a local capture tool must not make the
+   * demo-contact protection disappear, or a dry run of the scheduled job would
+   * behave differently from the real one.
    */
-  isAllowedRecipient(email: string): { allowed: boolean; reason?: string } {
-    if (this.isLocalCapture) return { allowed: true };
-
+  isAllowedRecipient(
+    email: string,
+    purpose: MailPurpose = 'transactional',
+  ): { allowed: boolean; reason?: string } {
     const mail = this.config.get<any>('mail');
     const target = String(email ?? '').trim().toLowerCase();
 
-    // The configured sender is always permitted. A message addressed to the
-    // account that is doing the sending cannot reach a third party, and this
-    // is what makes a self-addressed connectivity test possible without
-    // widening the allow-list for everyone else.
+    if (!isSyntacticallyValid(target)) {
+      return {
+        allowed: false,
+        reason: `"${email}" is not a valid email address. Nothing was sent.`,
+      };
+    }
+
+    const domain = target.split('@')[1] ?? '';
+
+    if (purpose === 'notification') {
+      const blocked: string[] = mail.notificationBlockedDomains ?? [];
+      if (blocked.some((d) => d.toLowerCase() === domain)) {
+        return {
+          allowed: false,
+          reason:
+            `"${domain}" is in NOTIFICATION_BLOCKED_DOMAINS, so automated notifications are not ` +
+            'sent there. This protects the seeded demo contacts from bulk email. ' +
+            'Invitations and admin-initiated sends to this address are unaffected.',
+        };
+      }
+    }
+
+    if (this.isLocalCapture) return { allowed: true };
+
+    // A message to the account doing the sending cannot reach a third party.
     const self = [mail.user, mail.fromAddress]
       .filter(Boolean)
       .map((a: string) => a.trim().toLowerCase());
     if (self.includes(target)) return { allowed: true };
 
-    const allowed: string[] = this.config.get('mail.allowedDomains') ?? [];
-    if (allowed.length === 0) return { allowed: true };
+    if (mail.recipientPolicy === 'unrestricted') return { allowed: true };
 
-    const domain = target.split('@')[1]?.toLowerCase();
-    if (domain && allowed.some((d) => d.toLowerCase() === domain)) {
+    const allowed: string[] = mail.allowedDomains ?? [];
+    if (allowed.some((d) => d.toLowerCase() === domain)) {
       return { allowed: true };
     }
 
     return {
       allowed: false,
       reason:
-        `Real email delivery is configured, and "${domain ?? email}" is not in MAIL_ALLOWED_DOMAINS ` +
-        `(${allowed.join(', ')}). Nothing was sent. Add the domain to MAIL_ALLOWED_DOMAINS in ` +
-        'backend/.env and restart the backend to allow it.',
+        `MAIL_RECIPIENT_POLICY is "allowlist" and "${domain}" is not in MAIL_ALLOWED_DOMAINS ` +
+        `(${allowed.length ? allowed.join(', ') : 'empty'}). Nothing was sent. Either add the domain, ` +
+        'or set MAIL_RECIPIENT_POLICY=unrestricted in backend/.env and restart the backend.',
     };
   }
 
@@ -218,10 +268,12 @@ export class MailerService implements OnModuleInit {
     subject: string;
     html: string;
     fromName?: string;
+    /** Defaults to transactional; the scheduled run passes 'notification'. */
+    purpose?: MailPurpose;
   }): Promise<SendResult> {
     const mail = this.config.get<any>('mail');
 
-    const gate = this.isAllowedRecipient(options.to);
+    const gate = this.isAllowedRecipient(options.to, options.purpose ?? 'transactional');
     if (!gate.allowed) {
       this.logger.warn(`Refused to send to ${options.to}: ${gate.reason}`);
       return { status: 'skipped', error: gate.reason };
