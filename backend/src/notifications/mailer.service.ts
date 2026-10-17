@@ -184,10 +184,22 @@ export class MailerService implements OnModuleInit {
   isAllowedRecipient(email: string): { allowed: boolean; reason?: string } {
     if (this.isLocalCapture) return { allowed: true };
 
+    const mail = this.config.get<any>('mail');
+    const target = String(email ?? '').trim().toLowerCase();
+
+    // The configured sender is always permitted. A message addressed to the
+    // account that is doing the sending cannot reach a third party, and this
+    // is what makes a self-addressed connectivity test possible without
+    // widening the allow-list for everyone else.
+    const self = [mail.user, mail.fromAddress]
+      .filter(Boolean)
+      .map((a: string) => a.trim().toLowerCase());
+    if (self.includes(target)) return { allowed: true };
+
     const allowed: string[] = this.config.get('mail.allowedDomains') ?? [];
     if (allowed.length === 0) return { allowed: true };
 
-    const domain = email.split('@')[1]?.toLowerCase();
+    const domain = target.split('@')[1]?.toLowerCase();
     if (domain && allowed.some((d) => d.toLowerCase() === domain)) {
       return { allowed: true };
     }

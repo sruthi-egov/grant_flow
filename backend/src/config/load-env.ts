@@ -72,10 +72,16 @@ export interface EnvLoadReport {
   deferred: string[];
   /** Names present in .env that the application never reads. */
   unrecognised: string[];
+  /**
+   * Names assigned more than once. The last assignment wins, so an earlier
+   * edit can be silently overridden by a stale line further down the file.
+   */
+  duplicated: Array<{ name: string; occurrences: number }>;
 }
 
-function parse(contents: string): Map<string, string> {
+function parse(contents: string): { values: Map<string, string>; counts: Map<string, number> } {
   const result = new Map<string, string>();
+  const counts = new Map<string, number>();
 
   for (const rawLine of contents.split(/\r?\n/)) {
     const line = rawLine.trim();
@@ -97,10 +103,13 @@ function parse(contents: string): Map<string, string> {
       value = value.slice(1, -1);
     }
 
+    // A later assignment overwrites an earlier one, which is how a stale line
+    // can silently defeat a fresh edit. The count is kept so this is reported.
+    counts.set(key, (counts.get(key) ?? 0) + 1);
     result.set(key, value);
   }
 
-  return result;
+  return { values: result, counts };
 }
 
 export function loadEnv(cwd: string = process.cwd()): EnvLoadReport {
@@ -112,12 +121,17 @@ export function loadEnv(cwd: string = process.cwd()): EnvLoadReport {
     overridden: [],
     deferred: [],
     unrecognised: [],
+    duplicated: [],
   };
 
   if (!existsSync(file)) return report;
 
   report.loaded = true;
-  const values = parse(readFileSync(file, 'utf8'));
+  const { values, counts } = parse(readFileSync(file, 'utf8'));
+
+  for (const [name, occurrences] of counts) {
+    if (occurrences > 1) report.duplicated.push({ name, occurrences });
+  }
 
   for (const [key, value] of values) {
     if (!RECOGNISED.has(key) && value !== '') {
@@ -171,6 +185,13 @@ export function describeEnvLoad(report: EnvLoadReport): string[] {
     lines.push(
       `.env left blank, so the inherited value is still in use for: ${names}. ` +
         'Set it in .env, or clear it from your environment, if that is not what you want.',
+    );
+  }
+
+  for (const { name, occurrences } of report.duplicated) {
+    lines.push(
+      `.env assigns ${name} ${occurrences} times — only the LAST one takes effect. ` +
+        'Remove the earlier lines, or an edit you made further up the file will be ignored.',
     );
   }
 

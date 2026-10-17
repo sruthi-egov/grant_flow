@@ -216,4 +216,43 @@ describe('sending', () => {
     expect(sendMail).toHaveBeenCalled();
     expect(result.status).toBe('sent');
   });
+
+  it('always allows the configured sender, so a self-test needs no allow-list change', async () => {
+    const { service, sendMail } = build({
+      user: 'sender@gmail.com',
+      fromAddress: 'sender@gmail.com',
+      allowedDomains: ['grantos.local'], // deliberately excludes gmail.com
+    });
+
+    const result = await service.send({ to: 'sender@gmail.com', subject: 's', html: 'h' });
+
+    expect(sendMail).toHaveBeenCalled();
+    expect(result.status).toBe('sent');
+  });
+
+  it('matches the sender case-insensitively and ignores padding', async () => {
+    const { service, sendMail } = build({
+      user: 'sender@gmail.com',
+      fromAddress: 'sender@gmail.com',
+      allowedDomains: ['grantos.local'],
+    });
+
+    const result = await service.send({ to: '  SENDER@Gmail.COM ', subject: 's', html: 'h' });
+
+    expect(sendMail).toHaveBeenCalled();
+    expect(result.status).toBe('sent');
+  });
+
+  it('still refuses a different address on the sender domain', async () => {
+    const { service, sendMail } = build({
+      user: 'sender@gmail.com',
+      fromAddress: 'sender@gmail.com',
+      allowedDomains: ['grantos.local'],
+    });
+
+    const result = await service.send({ to: 'someone-else@gmail.com', subject: 's', html: 'h' });
+
+    expect(sendMail).not.toHaveBeenCalled();
+    expect(result.status).toBe('skipped');
+  });
 });

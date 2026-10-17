@@ -168,7 +168,7 @@ reason the baseline commit was made first.
 | Item | Status | Why | How to resolve |
 |---|---|---|---|
 | **Live AI extraction** | ✅ **Working (2026-10-16)** | A valid key is now in `backend/.env`. Minimal connectivity check returned `{"ok":true}` in 2.7 s; full extraction returned **6 deliverables and 6 milestones** with correct amounts, dates and source sections in 15.6 s on `gpt-4o-mini`. | — |
-| **Gmail SMTP** | ❌ **Blocked — `SMTP_USER` is still the placeholder** | `SMTP_USER` is literally `your-new-email@gmail.com`, copied from `.env.example` without substitution, so Gmail returns `535-5.7.8 Username and Password not accepted`. | Set `SMTP_USER` to the real Gmail address (see §10). |
+| **Gmail SMTP** | ✅ **Working (2026-10-17)** | `transporter.verify()` completed a real AUTH handshake against `smtp.gmail.com:587`; one labelled test email to the sender account returned `status: sent`. | Confirm the message arrived in the inbox. |
 | **Browser UI verification** | ⚠️ Not done | The `chrome-devtools` MCP server failed to connect this session. | Manual steps in `LOCAL_DEMO_GUIDE.md` → "Five-minute walkthrough". |
 | **Base44 data import** | ❌ Not possible | The export contains **source code and schema only** — no database rows and no uploaded PDFs. | Requires a data export from Base44. See §7. |
 | `inviteUser`, `sendTestNotification`, DB reset, file cleanup | Implemented, not exercised | Destructive or needs a UI flow. | Exercise manually during the demo. |
@@ -394,6 +394,40 @@ sent verbatim, so every whitespace character is now stripped from `SMTP_PASS`.
 **Honest reporting.** A dry run returns `skipped`, never `sent`; a refused
 recipient returns `skipped` with the reason; a transport failure returns
 `failed`. There is no fallback to a local sink.
+
+### Gmail SMTP commissioned (2026-10-17)
+
+Authentication succeeded and one labelled test email was delivered to the
+sending account. Scheduled notifications are **disabled**
+(`NOTIFICATIONS_CRON_ENABLED=false`), and no demo contact or existing user was
+emailed.
+
+Three configuration faults were found and corrected in `backend/.env`, with a
+timestamped backup taken first:
+
+| Fault | Effect | Fix |
+|---|---|---|
+| `NOTIFICATIONS_CRON_ENABLED` assigned **twice** — `false` on line 62, a stale `true` on line 66 | The last assignment wins, so the cron was **still enabled** despite the edit | Stale line removed |
+| `MAIL_FROM_ADDRESS` assigned twice (values identical) | Harmless, but the same trap one edit away | Duplicate removed |
+| `EMAIL_FROM` set | Never read by the application — had no effect | Removed as redundant |
+
+`load-env.ts` now reports duplicate assignments at startup, naming the variable
+and explaining that only the last takes effect. That is how this class of fault
+becomes visible rather than silent.
+
+**Sender self-send exception.** `MAIL_ALLOWED_DOMAINS` does not include the
+sender's domain, so even a self-addressed test would have been refused. The
+configured `SMTP_USER` / `MAIL_FROM_ADDRESS` is now always an allowed
+recipient — a message to the sending account cannot reach a third party. Every
+other address is still subject to the allow-list, including other addresses on
+the same domain (covered by unit tests).
+
+**Automated checks cannot send real mail.** `scripts/verify/end-to-end.ps1`
+reads the SMTP mode and switches notification processing to `dry_run` when
+delivery is live. `scripts/verify/invitations.ps1` refuses to run entirely
+under real delivery unless `GRANTOS_ALLOW_REAL_SEND=1` is set, because each
+invitation it creates would attempt delivery to a non-existent
+`@grantos.local` domain and generate bounces.
 
 ### Still unverified
 
