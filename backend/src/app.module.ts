@@ -9,6 +9,7 @@ import { UsersModule } from './users/users.module';
 import { EntitiesModule } from './entities/entities.module';
 import { FilesModule } from './files/files.module';
 import { AiModule } from './ai/ai.module';
+import { AssistantModule } from './assistant/assistant.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { AdminModule } from './admin/admin.module';
 import { HealthModule } from './health/health.module';
@@ -34,6 +35,7 @@ import { HealthModule } from './health/health.module';
     EntitiesModule,
     FilesModule,
     AiModule,
+    AssistantModule,
     NotificationsModule,
     AdminModule,
     HealthModule,

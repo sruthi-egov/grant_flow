@@ -190,6 +190,62 @@ export class AiService implements OnModuleInit {
     }
   }
 
+  /**
+   * Runs a prompt and returns prose.
+   *
+   * Separate from completeJson because that one pins
+   * `response_format: json_object` for extraction. Routing conversational
+   * questions through it made the model reply with a JSON object, which the
+   * dashboard assistant then tried to render as a React child and crashed on.
+   */
+  async completeText(options: {
+    prompt: string;
+    systemPrompt: string;
+    maxTokens?: number;
+    temperature?: number;
+  }): Promise<LlmCallResult<string>> {
+    const client = this.getClient();
+    const model = this.config.get<string>('ai.model')!;
+
+    let response;
+    try {
+      response = await client.chat.completions.create({
+        model,
+        messages: [
+          { role: 'system', content: options.systemPrompt },
+          { role: 'user', content: options.prompt },
+        ],
+        // Deliberately no response_format: the caller wants readable prose.
+        temperature: options.temperature ?? 0.2,
+        max_tokens: options.maxTokens ?? 1200,
+      });
+    } catch (error: any) {
+      this.logger.error(`OpenAI request failed: ${error?.message ?? String(error)}`);
+      throw new ServiceUnavailableException({
+        error: 'ai_request_failed',
+        ...this.describeProviderError(error),
+      });
+    }
+
+    const content = response.choices?.[0]?.message?.content ?? '';
+    if (!content.trim()) {
+      throw new ServiceUnavailableException({
+        error: 'ai_empty_response',
+        message: 'The AI provider returned an empty response.',
+      });
+    }
+
+    return {
+      data: content.trim(),
+      model,
+      provider: 'openai',
+      usage: {
+        prompt_tokens: response.usage?.prompt_tokens,
+        completion_tokens: response.usage?.completion_tokens,
+      },
+    };
+  }
+
   /** Tolerates a stray code fence, but never fabricates a result. */
   private parseJson<T>(content: string): T {
     const cleaned = content

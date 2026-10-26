@@ -1,9 +1,24 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import { Link } from "react-router-dom";
 import { api } from "@/api/apiClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { MessageSquare, Send, Loader2, Sparkles } from "lucide-react";
+import { Send, Loader2, Sparkles, AlertCircle, RotateCw, Info } from "lucide-react";
+
+/**
+ * Dashboard assistant.
+ *
+ * The question, the selected scope and a short conversation history are sent
+ * to POST /api/assistant/ask. The backend decides what the signed-in user may
+ * read, computes counts and date arithmetic from the database, and returns
+ * prose plus the records it drew on.
+ *
+ * Previously this component assembled the context in the browser and called a
+ * generic LLM endpoint that is pinned to JSON-object mode. The reply was an
+ * object, which React cannot render as a child, so the whole dashboard went
+ * blank. Answers are now rendered defensively as text whatever comes back.
+ */
 
 const SCOPES = ["All Data", "Grants", "SOWs", "MSAs", "MOUs", "Deliverables", "Milestones", "Tranches", "Contacts", "Documents"];
 
@@ -18,228 +33,98 @@ const SUGGESTED_QUESTIONS = [
   "Which records have missing end dates?",
 ];
 
-function fmt(v) { return v || "—"; }
-function fmtAmt(v) { return v != null ? `$${Number(v).toLocaleString()}` : "—"; }
-
-function buildContext(scope, props) {
-  const {
-    grants = [], milestones = [], deadlines = [], sows = [], msas = [], mous = [],
-    tranches = [], grantDeliverables = [], sowDeliverables = [], sowMilestones = [],
-    mouCommitments = [], msaKeyClauses = [], obligations = [], uploadLogs = [],
-  } = props;
-
-  const sections = [];
-  const include = (name) => scope === "All Data" || scope === name;
-
-  if (include("Grants")) {
-    sections.push(`GRANTS (${grants.length} records):
-${grants.map(g =>
-  `- "${fmt(g.title || g.grant_name)}" | Funder: ${fmt(g.funder)} | #${fmt(g.grant_number)} | Status: ${fmt(g.status)} | Amount: ${fmtAmt(g.total_amount)} | Start: ${fmt(g.start_date)} | End: ${fmt(g.end_date)}`
-).join("\n") || "None"}`);
+/** Never hand React anything but a string, whatever the API returned. */
+function asText(value) {
+  if (typeof value === "string") return value;
+  if (value == null) return "";
+  try {
+    return JSON.stringify(value, null, 2);
+  } catch {
+    return String(value);
   }
-
-  if (include("MSAs")) {
-    sections.push(`MSAs (${msas.length} records):
-${msas.map(m =>
-  `- "${fmt(m.title)}" | Vendor: ${fmt(m.vendor_name)} | #${fmt(m.msa_number)} | Status: ${fmt(m.status)} | Effective: ${fmt(m.effective_date)} | End: ${fmt(m.end_date)} | Governing Law: ${fmt(m.governing_law)} | Notice Period: ${fmt(m.notice_period)} | Auto-renew: ${m.auto_renew ? "Yes" : "No"} | Liability Cap: ${fmt(m.liability_cap)} | IP: ${fmt(m.ip_ownership)}`
-).join("\n") || "None"}`);
-
-    if (msaKeyClauses.length > 0) {
-      const msaMap = Object.fromEntries(msas.map(m => [m.id, m.title]));
-      sections.push(`MSA KEY CLAUSES (${msaKeyClauses.length} records):
-${msaKeyClauses.map(c =>
-  `- MSA: "${fmt(msaMap[c.msa_id])}" | Clause: ${fmt(c.clause_title)} | Type: ${fmt(c.clause_type)} | Risk: ${fmt(c.risk_level)} | Ref: ${fmt(c.clause_number || c.clause_reference)} | Summary: ${fmt(c.summary)}`
-).join("\n")}`);
-    }
-
-    // Structured services from MSA records
-    const msasWithServices = msas.filter(m => m.structured_services?.length > 0);
-    if (msasWithServices.length > 0) {
-      sections.push(`MSA SCOPE OF SERVICES:
-${msasWithServices.map(m =>
-  `- MSA: "${fmt(m.title)}" has ${m.structured_services.length} service(s): ${m.structured_services.map(s => s.service_category || s.description).filter(Boolean).join("; ")}`
-).join("\n")}`);
-    }
-  }
-
-  if (include("MOUs")) {
-    sections.push(`MOUs (${mous.length} records):
-${mous.map(m =>
-  `- "${fmt(m.title)}" | Partner: ${fmt(m.partner_name)} | Type: ${fmt(m.partner_type)} | #${fmt(m.mou_number)} | Status: ${fmt(m.status)} | Effective: ${fmt(m.effective_date)} | End: ${fmt(m.end_date)} | Purpose: ${fmt(m.purpose)} | Scope: ${fmt(m.scope_of_collaboration)} | Governing Law: ${fmt(m.governing_law)}`
-).join("\n") || "None"}`);
-
-    if (mouCommitments.length > 0) {
-      const mouMap = Object.fromEntries(mous.map(m => [m.id, m.title]));
-      sections.push(`MOU COMMITMENTS (${mouCommitments.length} records):
-${mouCommitments.map(c =>
-  `- MOU: "${fmt(mouMap[c.mou_id])}" | Commitment: ${fmt(c.name)} | Type: ${fmt(c.commitment_type)} | Party: ${fmt(c.responsible_party)} | Status: ${fmt(c.status)} | Due: ${fmt(c.due_date)} | Frequency: ${fmt(c.frequency)}`
-).join("\n")}`);
-    }
-
-    // MOU contacts stored in mou.contacts array
-    const mousWithContacts = mous.filter(m => m.contacts?.length > 0);
-    if (mousWithContacts.length > 0) {
-      sections.push(`MOU CONTACTS:
-${mousWithContacts.map(m =>
-  m.contacts.map(c =>
-    `- MOU: "${fmt(m.title)}" | Name: ${fmt(c.name)} | Org: ${fmt(c.organization)} | Role: ${fmt(c.role)} | Email: ${fmt(c.email)} | Phone: ${fmt(c.phone)}`
-  ).join("\n")
-).join("\n")}`);
-    }
-  }
-
-  if (include("SOWs")) {
-    sections.push(`SOWs (${sows.length} records):
-${sows.map(s =>
-  `- "${fmt(s.title)}" | Vendor: ${fmt(s.vendor_name)} | #${fmt(s.sow_number)} | Status: ${fmt(s.status)} | Start: ${fmt(s.start_date)} | End: ${fmt(s.end_date)} | Monthly Rate: ${fmtAmt(s.monthly_rate)} | Total Value: ${fmtAmt(s.total_value)} | Payment Day: ${fmt(s.payment_day)}`
-).join("\n") || "None"}`);
-
-    // Rate cards from SOW records
-    const sowsWithRateCards = sows.filter(s => s.rate_cards?.length > 0);
-    if (sowsWithRateCards.length > 0) {
-      sections.push(`SOW RATE CARDS:
-${sowsWithRateCards.map(s =>
-  `- SOW: "${fmt(s.title)}" has ${s.rate_cards.length} rate card table(s): ${s.rate_cards.map(r => r.table_title || r.table_type).filter(Boolean).join("; ")}`
-).join("\n")}`);
-    }
-  }
-
-  if (include("Milestones")) {
-    const grantMap = Object.fromEntries(grants.map(g => [g.id, g.title || g.grant_name]));
-    const sowMap = Object.fromEntries(sows.map(s => [s.id, s.title]));
-    sections.push(`GRANT MILESTONES (${milestones.length} records):
-${milestones.map(m =>
-  `- Grant: "${fmt(grantMap[m.grant_id])}" | ${fmt(m.title)} | Amount: ${fmtAmt(m.amount)} | Due: ${fmt(m.due_date)} | Status: ${fmt(m.status)} | Type: ${fmt(m.milestone_type)}`
-).join("\n") || "None"}`);
-
-    if (sowMilestones.length > 0) {
-      sections.push(`SOW MILESTONES (${sowMilestones.length} records):
-${sowMilestones.map(m =>
-  `- SOW: "${fmt(sowMap[m.sow_id])}" | ${fmt(m.title)} | Amount: ${fmtAmt(m.amount)} | Due: ${fmt(m.due_date)} | Status: ${fmt(m.status)}`
-).join("\n")}`);
-    }
-  }
-
-  if (include("Tranches")) {
-    const grantMap = Object.fromEntries(grants.map(g => [g.id, g.title || g.grant_name]));
-    sections.push(`GRANT TRANCHES (${tranches.length} records):
-${tranches.map(t =>
-  `- Grant: "${fmt(grantMap[t.grant_id])}" | ${fmt(t.title || t.tranche_name)} | Amount: ${fmtAmt(t.amount)} | Due: ${fmt(t.due_date)} | Status: ${fmt(t.status)} | Trigger: ${fmt(t.invoice_trigger_date)} | Received: ${fmt(t.received_date)}`
-).join("\n") || "None"}`);
-  }
-
-  if (include("Deliverables")) {
-    const grantMap = Object.fromEntries(grants.map(g => [g.id, g.title || g.grant_name]));
-    const sowMap = Object.fromEntries(sows.map(s => [s.id, s.title]));
-    sections.push(`GRANT DELIVERABLES (${grantDeliverables.length} records):
-${grantDeliverables.map(d =>
-  `- Grant: "${fmt(grantMap[d.grant_id])}" | ${fmt(d.name)} | Due: ${fmt(d.due_date)} | Status: ${fmt(d.status)} | Category: ${fmt(d.category)}`
-).join("\n") || "None"}`);
-
-    if (sowDeliverables.length > 0) {
-      sections.push(`SOW DELIVERABLES (${sowDeliverables.length} records):
-${sowDeliverables.map(d =>
-  `- SOW: "${fmt(sowMap[d.sow_id])}" | ${fmt(d.name)} | Due: ${fmt(d.due_date)} | Status: ${fmt(d.status)} | Category: ${fmt(d.category)}`
-).join("\n")}`);
-    }
-  }
-
-  if (include("Grants") || include("All Data")) {
-    if (obligations.length > 0) {
-      const grantMap = Object.fromEntries(grants.map(g => [g.id, g.title || g.grant_name]));
-      sections.push(`REPORTING OBLIGATIONS (${obligations.length} records):
-${obligations.map(o =>
-  `- Grant: "${fmt(grantMap[o.grant_id])}" | ${fmt(o.report_type || o.title)} | Due: ${fmt(o.due_date)} | Frequency: ${fmt(o.frequency)} | Status: ${fmt(o.status)}`
-).join("\n")}`);
-    }
-
-    if (deadlines.length > 0) {
-      const grantMap = Object.fromEntries(grants.map(g => [g.id, g.title || g.grant_name]));
-      sections.push(`REPORTING DEADLINES (${deadlines.length} records):
-${deadlines.map(d =>
-  `- Grant: "${fmt(grantMap[d.grant_id])}" | ${fmt(d.report_type)} | Due: ${fmt(d.due_date)} | Status: ${fmt(d.status)}`
-).join("\n")}`);
-    }
-  }
-
-  if (include("Documents")) {
-    sections.push(`UPLOADED DOCUMENTS (${uploadLogs.length} records):
-${uploadLogs.slice(0, 100).map(u =>
-  `- "${fmt(u.file_name)}" | Module: ${fmt(u.entity_type)} | Entity: ${fmt(u.entity_name)} | DPI Relevant: ${u.is_dpi_relevant ? "Yes" : "No"} | Duplicate: ${u.is_duplicate ? "Yes" : "No"} | Invalid: ${u.is_invalid ? "Yes" : "No"}`
-).join("\n") || "None"}`);
-  }
-
-  return sections.join("\n\n");
 }
 
 export default function DataQueryChat(props) {
   const {
-    grants = [], milestones = [], deadlines = [], sows = [], msas = [], mous = [],
-    tranches = [], grantDeliverables = [], sowDeliverables = [], sowMilestones = [],
-    mouCommitments = [], msaKeyClauses = [], obligations = [], uploadLogs = [],
+    grants = [], sows = [], msas = [], mous = [], milestones = [], tranches = [],
+    grantDeliverables = [], sowDeliverables = [], mouCommitments = [], msaKeyClauses = [],
   } = props;
 
   const [question, setQuestion] = useState("");
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
   const [scope, setScope] = useState("All Data");
   const [user, setUser] = useState(null);
+
+  // Guards against a second submit while one is in flight: `loading` alone is
+  // a state update and can lag behind two fast clicks.
+  const inFlight = useRef(false);
+  const scrollRef = useRef(null);
 
   useEffect(() => {
     api.auth.me().then(setUser).catch(() => {});
   }, []);
 
-  // Respect module permissions for non-admins
+  useEffect(() => {
+    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+  }, [messages, loading]);
+
+  // Scope buttons a non-admin may use, mirroring their module permissions.
+  // The backend enforces this independently.
   const allowedScope = (scopeName) => {
     if (!user || user.role === "admin") return true;
     const allowed = user.allowed_modules || [];
-    if (allowed.length === 0) return true; // no restrictions set
-    const moduleMap = { Grants: "Grants", SOWs: "SOWs", MSAs: "MSAs", MOUs: "MOUs" };
-    const mod = moduleMap[scopeName];
+    if (allowed.length === 0) return true;
+    const mod = { Grants: "Grants", SOWs: "SOWs", MSAs: "MSAs", MOUs: "MOUs" }[scopeName];
     return !mod || allowed.includes(mod);
   };
-
   const availableScopes = SCOPES.filter(s => s === "All Data" || allowedScope(s));
 
   const ask = async (q) => {
-    const trimmed = q.trim();
-    if (!trimmed) return;
+    const trimmed = (q || "").trim();
+    if (!trimmed || inFlight.current) return;
 
+    inFlight.current = true;
+    setError(null);
+    setLoading(true);
     setMessages(prev => [...prev, { role: "user", text: trimmed }]);
     setQuestion("");
-    setLoading(true);
 
-    const today = new Date().toISOString().split("T")[0];
+    try {
+      const history = messages.slice(-6).map(m => ({ role: m.role, text: asText(m.text) }));
+      const result = await api.assistant.ask({ question: trimmed, scope, history });
 
-    // Filter props by allowed modules for non-admins
-    const filteredProps = { ...props };
-    if (user && user.role !== "admin" && user.allowed_modules?.length > 0) {
-      const allowed = user.allowed_modules;
-      if (!allowed.includes("SOWs")) { filteredProps.sows = []; filteredProps.sowDeliverables = []; filteredProps.sowMilestones = []; }
-      if (!allowed.includes("MSAs")) { filteredProps.msas = []; filteredProps.msaKeyClauses = []; }
-      if (!allowed.includes("MOUs")) { filteredProps.mous = []; filteredProps.mouCommitments = []; }
-      if (!allowed.includes("Grants")) { filteredProps.grants = []; filteredProps.milestones = []; filteredProps.tranches = []; filteredProps.grantDeliverables = []; }
+      setMessages(prev => [...prev, {
+        role: "assistant",
+        text: asText(result?.answer),
+        sources: Array.isArray(result?.sources) ? result.sources : [],
+        scopeNote: result?.scope_note || null,
+      }]);
+    } catch (err) {
+      // Keep the question so it can be retried rather than retyped, and show
+      // the real reason instead of a generic fallback answer.
+      setMessages(prev => prev.slice(0, -1));
+      setQuestion(trimmed);
+      setError(
+        err?.status === 503
+          ? (err?.message || "The AI service is unavailable. Check the backend's OpenAI configuration.")
+          : err?.status === 429
+            ? "Too many questions in a short time. Wait a moment and try again."
+            : err?.status === 403
+              ? "You do not have access to the data needed for that question."
+              : (err?.message || "Could not get an answer. Please try again."),
+      );
+    } finally {
+      setLoading(false);
+      inFlight.current = false;
     }
-
-    const context = buildContext(scope, filteredProps);
-
-    const result = await api.integrations.Core.InvokeLLM({
-      prompt: `You are GrantOS, a comprehensive contract and grants management assistant. Answer the user's question concisely and specifically using ONLY the data provided below. Be specific with names, amounts, dates, and statuses. Format dates as "Month Day, Year". If calculating totals, show the breakdown. If the requested data is not in the context, say so clearly.
-
-Today's date: ${today}
-Active scope filter: ${scope}
-
-DATA:
-${context}
-
-User question: ${trimmed}`,
-    });
-
-    setMessages(prev => [...prev, { role: "assistant", text: result }]);
-    setLoading(false);
   };
 
-  const totalRecords = grants.length + sows.length + msas.length + mous.length + milestones.length + tranches.length + grantDeliverables.length + sowDeliverables.length + mouCommitments.length + msaKeyClauses.length;
+  const totalRecords =
+    grants.length + sows.length + msas.length + mous.length + milestones.length +
+    tranches.length + grantDeliverables.length + sowDeliverables.length +
+    mouCommitments.length + msaKeyClauses.length;
 
   return (
     <Card className="mt-6">
@@ -248,7 +133,9 @@ User question: ${trimmed}`,
           <CardTitle className="flex items-center gap-2 text-lg">
             <Sparkles className="w-5 h-5 text-primary" />
             GrantOS Assistant
-            <span className="text-xs font-normal text-muted-foreground ml-1">{totalRecords} records loaded</span>
+            <span className="text-xs font-normal text-muted-foreground ml-1">
+              {totalRecords} records loaded
+            </span>
           </CardTitle>
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-xs text-muted-foreground">Scope:</span>
@@ -256,7 +143,8 @@ User question: ${trimmed}`,
               <button
                 key={s}
                 onClick={() => setScope(s)}
-                className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
+                disabled={loading}
+                className={`text-xs px-2.5 py-1 rounded-full border transition-colors disabled:opacity-50 ${
                   scope === s
                     ? "bg-primary text-primary-foreground border-primary"
                     : "border-input text-muted-foreground hover:bg-muted"
@@ -268,14 +156,17 @@ User question: ${trimmed}`,
           </div>
         </div>
       </CardHeader>
+
       <CardContent className="space-y-4">
-        {messages.length === 0 && (
+        {messages.length === 0 && !loading && (
           <div className="flex flex-wrap gap-2">
             {SUGGESTED_QUESTIONS.map(q => (
               <button
                 key={q}
+                type="button"
                 onClick={() => ask(q)}
-                className="text-xs px-3 py-1.5 rounded-full border border-primary/30 bg-primary/5 text-primary hover:bg-primary/10 transition-colors"
+                disabled={loading}
+                className="text-xs px-3 py-1.5 rounded-full border border-primary/30 bg-primary/5 text-primary hover:bg-primary/10 transition-colors disabled:opacity-50"
               >
                 {q}
               </button>
@@ -283,26 +174,72 @@ User question: ${trimmed}`,
           </div>
         )}
 
-        {messages.length > 0 && (
-          <div className="space-y-3 max-h-80 overflow-y-auto pr-1">
+        {(messages.length > 0 || loading) && (
+          <div ref={scrollRef} className="space-y-3 max-h-96 overflow-y-auto pr-1">
             {messages.map((msg, i) => (
               <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
-                <div className={`max-w-[85%] rounded-xl px-4 py-2.5 text-sm whitespace-pre-wrap ${
+                <div className={`max-w-[85%] rounded-xl px-4 py-2.5 text-sm ${
                   msg.role === "user"
                     ? "bg-primary text-primary-foreground"
                     : "bg-muted text-foreground"
                 }`}>
-                  {msg.text}
+                  {msg.scopeNote && (
+                    <p className="flex items-start gap-1.5 mb-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-2 py-1.5">
+                      <Info className="w-3 h-3 mt-0.5 shrink-0" />
+                      <span>{asText(msg.scopeNote)}</span>
+                    </p>
+                  )}
+
+                  {/* Long answers wrap and the container scrolls; text is
+                      rendered as plain text, never as HTML. */}
+                  <div className="whitespace-pre-wrap break-words">{asText(msg.text)}</div>
+
+                  {msg.sources?.length > 0 && (
+                    <div className="mt-2.5 pt-2 border-t border-border/60">
+                      <p className="text-[11px] text-muted-foreground mb-1">Sources</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {msg.sources.map(s => (
+                          <Link
+                            key={`${s.type}-${s.id}`}
+                            to={s.url}
+                            className="text-[11px] px-2 py-0.5 rounded border border-input bg-background hover:bg-muted transition-colors"
+                            title={`${s.type}: ${s.name}`}
+                          >
+                            {s.type}: {String(s.name).slice(0, 40)}
+                          </Link>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
+
             {loading && (
               <div className="flex justify-start">
                 <div className="bg-muted rounded-xl px-4 py-2.5 flex items-center gap-2 text-sm text-muted-foreground">
-                  <Loader2 className="w-3 h-3 animate-spin" /> Thinking…
+                  <Loader2 className="w-3 h-3 animate-spin" /> Looking through your records…
                 </div>
               </div>
             )}
+          </div>
+        )}
+
+        {error && (
+          <div className="flex items-start gap-2 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+            <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="break-words">{asText(error)}</p>
+              {question.trim() && (
+                <button
+                  onClick={() => ask(question)}
+                  disabled={loading}
+                  className="mt-1.5 inline-flex items-center gap-1 text-xs font-medium text-red-700 hover:text-red-800 disabled:opacity-50"
+                >
+                  <RotateCw className="w-3 h-3" /> Retry
+                </button>
+              )}
+            </div>
           </div>
         )}
 
@@ -311,18 +248,29 @@ User question: ${trimmed}`,
             placeholder={`Ask anything about ${scope === "All Data" ? "your grants, MOUs, MSAs, SOWs…" : scope + "…"}`}
             value={question}
             onChange={e => setQuestion(e.target.value)}
-            onKeyDown={e => e.key === "Enter" && !loading && ask(question)}
+            onKeyDown={e => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                ask(question);
+              }
+            }}
             disabled={loading}
           />
-          <Button size="icon" onClick={() => ask(question)} disabled={loading || !question.trim()}>
+          <Button
+            size="icon"
+            onClick={() => ask(question)}
+            disabled={loading || !question.trim()}
+            aria-label="Send question"
+          >
             {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
           </Button>
         </div>
 
         {messages.length > 0 && (
           <button
-            className="text-xs text-muted-foreground hover:text-foreground"
-            onClick={() => setMessages([])}
+            className="text-xs text-muted-foreground hover:text-foreground disabled:opacity-50"
+            onClick={() => { setMessages([]); setError(null); }}
+            disabled={loading}
           >
             Clear conversation
           </button>

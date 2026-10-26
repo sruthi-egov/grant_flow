@@ -317,6 +317,20 @@ const users = {
     }),
 };
 
+/**
+ * Dashboard assistant.
+ *
+ * The backend loads and authorises the data, computes the counts and dates
+ * deterministically, and returns prose. Nothing is assembled in the browser.
+ */
+const assistant = {
+  ask: (payload: {
+    question: string;
+    scope?: string;
+    history?: Array<{ role: string; text: string }>;
+  }) => request<any>('/assistant/ask', { method: 'POST', body: payload }),
+};
+
 /** Invitation lifecycle. */
 const invitations = {
   /** Admin: every invitation, newest first. */
@@ -427,6 +441,6 @@ const system = {
   mailStatus: () => request<any>('/notifications/status'),
 };
 
-export const api = { entities, auth, users, invitations, integrations, functions, system, request };
+export const api = { entities, auth, users, invitations, assistant, integrations, functions, system, request };
 
 export default api;
